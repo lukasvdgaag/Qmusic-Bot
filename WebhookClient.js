@@ -67,8 +67,6 @@ class WebhookClient {
         };
         if (this.content && this.content?.length > 0) payload.content = this.content;
 
-        console.log(payload)
-
         return axios.post(this.webhookURL, payload);
     }
 }

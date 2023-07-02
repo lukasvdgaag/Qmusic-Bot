@@ -68,8 +68,6 @@ class LoginInfo {
             // Request the credentials
             let response = await this.instance.get('https://myprivacy.dpgmedia.nl/consent?siteKey=ewjhEFT3YBV10QQd&callbackUrl=https%3a%2f%2fqmusic.nl%2fprivacy%2faccept%3foriginalUrl%3d%252f');
             await this.updateCookies(response);
-            console.log('Accepted privacy url: ' + response.config.url)
-            console.log('Accepted privacy: ' + response.status);
 
             let cookies = await this.cookieJar.getCookies('https://myprivacy.dpgmedia.nl/');
             const authIdCookie = cookies.filter(a => a.key === 'authId')[0].value;
@@ -77,14 +75,10 @@ class LoginInfo {
             // Accept the DPG Media Cookie Policy
             response = await this.instance.get(`https://qmusic.nl/privacy/accept?originalUrl=%2F&authId=${authIdCookie}`);
             await this.updateCookies(response);
-            console.log('Accepted cookie policy url: ' + response.config.url)
-            console.log('Accepted cookie policy: ' + response.status);
 
             // Get the CSRF token
             response = await this.instance.get('https://qmusic.nl/_csrf/?origin=https%3A%2F%2Fqmusic.nl&domain=.qmusic.nl');
             await this.updateCookies(response);
-            console.log('Got CSRF token: ' + response.config.url)
-            console.log('Got CSRF token: ' + response.status);
 
             // Retrieve the SSO session ticket
             response = await this.instance.get('https://login.dpgmedia.nl/authorize/sso?client_id=qmusicnl-web&redirect_uri=https%3A%2F%2Fqmusic.nl%2Flogin%2Fcallback&response_type=code&scope=profile+email+address+phone+openid&state=https%3A%2F%2Fqmusic.nl%2F', {
@@ -92,17 +86,11 @@ class LoginInfo {
                 validateStatus: (status) => status === 303
             });
             await this.updateCookies(response);
-            console.log('Retrieve SSO session ticket: ' + response.status);
 
             response = await this.instance.get(`https://login.dpgmedia.nl/identify?client_id=qmusicnl-web`);
             await this.updateCookies(response);
-            console.log('Identify: ' + response.status);
 
             // Login to the DPG Media account
-            // const loginPayload = qs.stringify({
-            //     username: this.username,
-            //     password: this.password
-            // });
             const loginPayload = new FormData();
             loginPayload.append('username', this.username);
             loginPayload.append('password', this.password);
@@ -115,7 +103,6 @@ class LoginInfo {
                 },
             });
             await this.updateCookies(response);
-            console.log('Logged in: ' + response.status);
 
             // Continue the login process
             response = await this.instance.get('https://login.dpgmedia.nl/authorize/continue/sso?client_id=qmusicnl-web', {
@@ -123,7 +110,6 @@ class LoginInfo {
                 validateStatus: (status) => status === 303
             });
             await this.updateCookies(response);
-            console.log('Continued login: ' + response.status);
 
             // request the redirect url of the previous response
             response = await this.instance.get(response.headers.location, {
@@ -131,17 +117,14 @@ class LoginInfo {
                 validateStatus: (status) => status === 303
             });
             await this.updateCookies(response);
-            console.log('Redirected to: ' + response.config.url + ' with status: ' + response.status);
 
             // request the redirect url of the previous response
             response = await this.instance.get(response.headers.location, {
                 maxRedirects: 0
             });
             await this.updateCookies(response);
-            console.log('Redirected to callback: ' + response.config.url + ' with status: ' + response.status);
 
             this.bearerToken = this.extractBearerTokenFromHtml(response.data);
-            console.log('Bearer token: ' + this.bearerToken);
         } catch (e) {
             console.error(e);
             this.bearerToken = null;
