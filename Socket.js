@@ -1,9 +1,13 @@
 const WebSocketClient = require('websocket').client;
 const WebhookClient = require('./WebhookClient');
 
+const ARTIST_TO_TRACK = 'TAYLOR SWIFT';
+
 class Socket {
 
-    constructor() {
+    constructor(authBank, catchTheSummerHit) {
+        this.authBank = authBank;
+        this.catchTheSummerHit = catchTheSummerHit;
         this.messages = [
             `["{\\"action\\":\\"join\\",\\"id\\":3,\\"sub\\":{\\"station\\":\\"qmusic_nl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
         ]
@@ -20,15 +24,14 @@ class Socket {
 
         this.client.on('connect', (connection) => {
             const embed = new WebhookClient();
-            embed.setTitle('Connected');
+            embed.setTitle('Connected to websocket');
             embed.setColor(0x7ed90e);
-            embed.setDescription('The connection to the Qmusic websocket has been established.');
+            embed.setDescription(`The connection to the Qmusic websocket has been established. Monitoring the Catch The Summer Hit game for ${this.authBank.loginInfos.size} users.`);
             embed.send();
 
             for (const message of this.messages) {
                 connection.sendUTF(message);
             }
-            // connection.sendUTF(subscribeToMainChannelMessage);
 
             connection.on('error', (e) => {
                 console.log("Connection Error: " + e.toString());
@@ -36,7 +39,7 @@ class Socket {
 
             connection.on('close', () => {
                 const embed = new WebhookClient();
-                embed.setTitle('Connection closed');
+                embed.setTitle('Connection to websocket closed');
                 embed.setColor(0xeb3424);
                 embed.setDescription('The connection to the Qmusic websocket has been closed. Trying to reconnect...');
                 embed.send();
@@ -44,7 +47,7 @@ class Socket {
                 this.init();
             });
 
-            connection.on('message', (message) => {
+            connection.on('message', async (message) => {
                 if (message.type === 'utf8') {
                     let input = message.utf8Data;
 
@@ -69,16 +72,36 @@ class Socket {
                                 const webhook = new WebhookClient();
                                 let listenLive = false;
 
-                                if (data.data.next?.artist.name.includes('TAYLOR SWIFT')) {
-                                    webhook.setContent('@everyone **TAYLOR SWIFT** is coming up next on Qmusic. Get your app ready!!');
-                                    webhook.setTitle(`Taylor Swift is coming up next!`)
-                                    webhook.setDescription(`Taylor Swift is coming up next on Qmusic. Get your app ready!!`);
+                                setTimeout(async () => {
+                                    const catchedUsers = await this.catchTheSummerHit.catchSong(data.data.id);
+                                    if (catchedUsers.length > 0) {
+                                        let userMentionString = '';
+
+                                        for (const username of catchedUsers) {
+                                            const discord = this.authBank.getUser(username)?.discord_id;
+                                            if (discord) userMentionString += `<@${discord}> `;
+                                        }
+
+                                        const embed = new WebhookClient();
+                                        if (userMentionString.length > 0) embed.setContent(`${userMentionString} I caught the Summer Hit: ${title} by ${artist}`);
+                                        embed.setTitle(`Catched Summer Hit`);
+                                        embed.addField('Title', title, true);
+                                        embed.addField('Artist', artist, true);
+                                        embed.addField('Catched for', catchedUsers.join(', '));
+                                        embed.send();
+                                    }
+                                }, 1000 * 10)
+
+                                if (ARTIST_TO_TRACK && data.data.next?.artist.name.includes(ARTIST_TO_TRACK)) {
+                                    webhook.setContent(`@everyone **${ARTIST_TO_TRACK}** is coming up next on Qmusic. Get your app ready!!`);
+                                    webhook.setTitle(`${ARTIST_TO_TRACK} is coming up next!`)
+                                    webhook.setDescription(`${ARTIST_TO_TRACK} is coming up next on Qmusic. Get your app ready!!`);
                                     webhook.setColor(0x8300a5)
                                     listenLive = true;
-                                } else if (artist.includes('TAYLOR SWIFT')) {
-                                    webhook.setContent('@everyone **TAYLOR SWIFT** IS PLAYING RIGHT NOW!!');
-                                    webhook.setTitle(`Taylor Swift is playing right now!`)
-                                    webhook.setDescription(`Taylor Swift is playing right now on Qmusic. Go send the message in the app!`);
+                                } else if (ARTIST_TO_TRACK && artist.includes(ARTIST_TO_TRACK)) {
+                                    webhook.setContent(`@everyone **${ARTIST_TO_TRACK}** IS PLAYING RIGHT NOW!!`);
+                                    webhook.setTitle(`${ARTIST_TO_TRACK} is playing right now!`)
+                                    webhook.setDescription(`${ARTIST_TO_TRACK} is playing right now on Qmusic. Go send the message in the app!`);
                                     webhook.setColor(0x8300a5)
                                     listenLive = true;
                                 } else {
@@ -102,7 +125,6 @@ class Socket {
                     } catch (e) {
                         //
                         console.log(e)
-                        console.log(input)
                     }
 
                 }

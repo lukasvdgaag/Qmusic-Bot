@@ -8,6 +8,7 @@ class WebhookClient {
         this.webhookURL = webhookURL;
         this.content = "";
         this.embed = {
+            color: 0xeb3424,
             title: '',
             description: '',
             fields: [],
