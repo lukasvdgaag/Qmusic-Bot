@@ -52,18 +52,9 @@ class LoginInfo {
         // this.instance = wrapper(this.instance);
     }
 
-    getFreshAxiosInstance() {
-        return axios.create({
-            withCredentials: true,
-            jar: this.cookieJar,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-                'Accept': '*/*'
-            }
-        });
-    }
-
     async processLogin() {
+        await this.cookieJar.removeAllCookiesSync();
+
         try {
             // Request the credentials
             let response = await this.instance.get('https://myprivacy.dpgmedia.nl/consent?siteKey=ewjhEFT3YBV10QQd&callbackUrl=https%3a%2f%2fqmusic.nl%2fprivacy%2faccept%3foriginalUrl%3d%252f');
