@@ -74,7 +74,7 @@ class Socket {
                                 let listenLive = false;
 
                                 setTimeout(async () => {
-                                    const catchedUsers = await this.catchTheSummerHit.catchSong(title);
+                                    const catchedUsers = await this.catchTheSummerHit.catchSong(title, artist);
                                     if (catchedUsers.length > 0) {
                                         let userMentionString = '';
 

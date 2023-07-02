@@ -103,7 +103,7 @@ class CatchTheSummerHit {
         });
     }
 
-    async catchSong(songTitle) {
+    async catchSong(songTitle, artistName) {
         if (!this.songsCatchers.has(songTitle)) {
             console.log('No one is catching this song');
             return [];
@@ -111,6 +111,12 @@ class CatchTheSummerHit {
 
         const promises = [];
         let songInfo = this.songsCatchers.get(songTitle);
+
+        if (songInfo.artist_name !== artistName) {
+            console.log('No one is catching this song');
+            return [];
+        }
+
         const songUsers = songInfo.getUsers();
 
         for (const username of songUsers) {
