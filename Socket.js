@@ -88,6 +88,7 @@ class Socket {
                                         embed.setTitle(`Catched Summer Hit`);
                                         embed.addField('Title', title, true);
                                         embed.addField('Artist', artist, true);
+                                        embed.addField('Points', `+${this.catchTheSummerHit.songsCatchers.get(title).points} points`, true);
                                         embed.addField('Catched for', catchedUsers.join(', '));
                                         embed.send();
                                     }
