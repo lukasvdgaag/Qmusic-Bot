@@ -1,7 +1,8 @@
 const WebSocketClient = require('websocket').client;
 const WebhookClient = require('./WebhookClient');
 
-const ARTIST_TO_TRACK = 'TAYLOR SWIFT';
+// const ARTIST_TO_TRACK = 'TAYLOR SWIFT';
+const ARTIST_TO_TRACK = null;
 
 class Socket {
 
@@ -73,7 +74,7 @@ class Socket {
                                 let listenLive = false;
 
                                 setTimeout(async () => {
-                                    const catchedUsers = await this.catchTheSummerHit.catchSong(data.data.id);
+                                    const catchedUsers = await this.catchTheSummerHit.catchSong(title);
                                     if (catchedUsers.length > 0) {
                                         let userMentionString = '';
 

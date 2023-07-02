@@ -1,10 +1,14 @@
 const axios = require('axios');
 const WebhookClient = require("./WebhookClient");
+const SummerHitInfo = require("./SummerHitInfo");
 
 class CatchTheSummerHit {
 
     constructor(authBank) {
         this.authBank = authBank;
+        /**
+         * @type {Map<string, SummerHitInfo>}
+         */
         this.songsCatchers = new Map();
 
         this.trackOfTheDay = null;
@@ -47,25 +51,27 @@ class CatchTheSummerHit {
     }
 
     async initContestantTracks() {
-        let trackOfTheDayId = this.trackOfTheDay.track_id;
+        let trackOfTheDayTitle = this.trackOfTheDay.track_title;
         const users = this.authBank.loginInfos.values();
 
         // Preparing the song catchers map
         this.songsCatchers.clear();
-        this.songsCatchers.set(trackOfTheDayId, []);
+        this.songsCatchers.set(trackOfTheDayTitle, new SummerHitInfo(this.trackOfTheDay));
 
         // Add the users to the song catchers map
         for (const userInfo of users) {
             const tracks = await this.getContestantTracks(userInfo.username);
 
-            this.songsCatchers.get(trackOfTheDayId).push(userInfo.username);
+            this.songsCatchers.get(trackOfTheDayTitle).addUser(userInfo.username);
             for (const track of tracks) {
-                if (!this.songsCatchers.has(track.track_id)) {
-                    this.songsCatchers.set(track.track_id, []);
+                if (!this.songsCatchers.has(track.track_title)) {
+                    this.songsCatchers.set(track.track_title, new SummerHitInfo(track));
                 }
-                this.songsCatchers.get(track.track_id).push(userInfo.username);
+                this.songsCatchers.get(track.track_title).addUser(userInfo.username);
             }
         }
+
+        console.log(this.songsCatchers)
     }
 
     async getContestantTracks(username) {
@@ -89,20 +95,26 @@ class CatchTheSummerHit {
         const user = this.authBank.getUser(username);
         if (!user) return;
 
-        const lol = await axios.post('https://api.qmusic.nl/2.4/cth/games/17/catches', {track_id: trackId}, {
+        console.log(`Catching song ${trackId} for user ${username}`)
+        return axios.post('https://api.qmusic.nl/2.4/cth/games/17/catches', {track_id: trackId}, {
             headers: {
                 'Authorization': `Bearer ${user.token}`
             }
         });
     }
 
-    async catchSong(trackId) {
-        if (!this.songsCatchers.has(trackId)) return [];
+    async catchSong(songTitle) {
+        if (!this.songsCatchers.has(songTitle)) {
+            console.log('No one is catching this song');
+            return [];
+        }
 
         const promises = [];
-        let songUsers = this.songsCatchers.get(trackId);
+        let songInfo = this.songsCatchers.get(songTitle);
+        const songUsers = songInfo.getUsers();
+
         for (const username of songUsers) {
-            promises.push(this.catchSongForUser(username, trackId));
+            promises.push(this.catchSongForUser(username, songInfo.track_id));
         }
 
         const results = await Promise.allSettled(promises);
