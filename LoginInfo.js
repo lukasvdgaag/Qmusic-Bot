@@ -2,18 +2,9 @@ const axios = require("axios");
 
 class LoginInfo {
 
-    constructor(accountId) {
-        this.accountId = accountId;
-
-    }
-
-    getUserKey() {
-        return {
-            user: {
-                accountId: this.accountId,
-                loggedIn: true,
-            }
-        }
+    constructor(username, password) {
+        this.username = username;
+        this.password = password;
     }
 
     generateBearerToken(username, password) {
