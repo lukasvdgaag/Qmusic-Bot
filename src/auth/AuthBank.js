@@ -59,6 +59,13 @@ class AuthBank {
         return this.users[username];
     }
 
+    getUserByDiscordId(discordId) {
+        for (const user of Object.values(this.users)) {
+            if (user.discord_id === discordId) return user;
+        }
+        return null;
+    }
+
     getLoginInfo(username) {
         return this.loginInfos.get(username);
     }

@@ -19,20 +19,24 @@ class CatchTheSummerHit {
 
     async init() {
         await this.loadTrackOfTheDay();
-        await this.initContestantTracks();
+        await this.initContestantsTracks();
 
         // start an interval that checks if it's the next day every hour
         setInterval(async () => {
-            const today = new Date();
-            const oldDate = new Date(this.trackOfTheDayLastUpdated);
-
-            if (today.getUTCFullYear() > oldDate.getUTCFullYear() ||
-                today.getUTCMonth() > oldDate.getUTCMonth() ||
-                today.getUTCDate() > oldDate.getUTCDate()) {
-                await this.loadTrackOfTheDay();
-                await this.initContestantTracks();
-            }
+            await this.checkForNewDay();
         }, 1000 * 60 * 60);
+    }
+
+    async checkForNewDay() {
+        const today = new Date();
+        const oldDate = new Date(this.trackOfTheDayLastUpdated);
+
+        if (today.getUTCFullYear() > oldDate.getUTCFullYear() ||
+            today.getUTCMonth() > oldDate.getUTCMonth() ||
+            today.getUTCDate() > oldDate.getUTCDate()) {
+            await this.loadTrackOfTheDay();
+            await this.initContestantsTracks();
+        }
     }
 
     async loadTrackOfTheDay() {
@@ -50,9 +54,9 @@ class CatchTheSummerHit {
         webhook.send();
     }
 
-    async initContestantTracks() {
+    async initContestantsTracks() {
         let trackOfTheDayTitle = this.trackOfTheDay.track_title;
-        const users = this.authBank.loginInfos.values();
+        const users = Object.keys(this.authBank.users);
 
         // Preparing the song catchers map
         this.songsCatchers.clear();
@@ -60,7 +64,11 @@ class CatchTheSummerHit {
 
         // Add the users to the song catchers map
         for (const userInfo of users) {
-            const tracks = await this.getContestantTracks(userInfo.username);
+            const contestantInfo = await this.getContestantInfo(userInfo.username);
+            // If the user has no tracks or if they have not yet entered the game on their app, skip them.
+            if (!contestantInfo) continue;
+
+            const tracks = contestantInfo.tracks;
 
             this.songsCatchers.get(trackOfTheDayTitle).addUser(userInfo.username);
             for (const track of tracks) {
@@ -70,13 +78,31 @@ class CatchTheSummerHit {
                 this.songsCatchers.get(track.track_title).addUser(userInfo.username);
             }
         }
-
-        console.log(this.songsCatchers)
     }
 
-    async getContestantTracks(username) {
+    async initContestantTracks(username) {
+        const contestantInfo = await this.getContestantInfo(username);
+        // If the user has no tracks or if they have not yet entered the game on their app, skip them.
+        if (!contestantInfo) return;
+
+        const tracks = contestantInfo.tracks;
+
+        // Add the user to the global song
+        let globalHit = this.songsCatchers.get(this.trackOfTheDay.track_title);
+        if (!globalHit.hasUser(username)) globalHit.addUser(username);
+
+        // Adding all the users' personal songs to the catchers map
+        for (const track of tracks) {
+            if (!this.songsCatchers.has(track.track_title)) {
+                this.songsCatchers.set(track.track_title, new SummerHitInfo(track));
+            }
+            this.songsCatchers.get(track.track_title).addUser(username);
+        }
+    }
+
+    async getContestantInfo(username) {
         const user = this.authBank.getUser(username);
-        if (!user) return [];
+        if (!user) return undefined;
 
         try {
             const {data} = await axios.get('https://api.qmusic.nl/2.4/cth/games/17/contestant', {
@@ -85,9 +111,9 @@ class CatchTheSummerHit {
                 }
             });
 
-            return data.contestant.tracks;
+            return data.contestant;
         } catch (e) {
-            console.error(e);
+            return undefined;
         }
     }
 
@@ -95,12 +121,37 @@ class CatchTheSummerHit {
         const user = this.authBank.getUser(username);
         if (!user) return;
 
-        console.log(`Catching song ${trackId} for user ${username}`)
-        return axios.post('https://api.qmusic.nl/2.4/cth/games/17/catches', {track_id: trackId}, {
-            headers: {
-                'Authorization': `Bearer ${user.token}`
-            }
-        });
+        try {
+            return axios.post('https://api.qmusic.nl/2.4/cth/games/17/catches', {track_id: trackId}, {
+                headers: {
+                    'Authorization': `Bearer ${user.token}`
+                }
+            });
+        } catch (e) {
+            console.log(e);
+            return undefined;
+        }
+    }
+
+    async getHighscoresForUser(username, limit = 10) {
+        const user = this.authBank.getUser(username);
+        if (!user) return;
+
+        try {
+            const {data} = await axios.get(`https://api.qmusic.nl/2.4/cth/games/17/highscores`, {
+                params: {
+                    limit
+                },
+                headers: {
+                    'Authorization': `Bearer ${user.token}`
+                }
+            });
+
+            return data.highscores;
+        } catch (e) {
+            console.log(e);
+            return undefined;
+        }
     }
 
     async catchSong(songTitle, artistName) {
@@ -126,7 +177,7 @@ class CatchTheSummerHit {
         const results = await Promise.allSettled(promises);
         // check if all the axios requests have an OK status
         let catchedUsers = [];
-        for (let i = 0; i<results.length; i++) {
+        for (let i = 0; i < results.length; i++) {
             const result = results[i];
             if (result.status !== 'fulfilled') {
                 continue;

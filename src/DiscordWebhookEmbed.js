@@ -1,7 +1,4 @@
 const axios = require('axios');
-const path = require("path");
-const envLoc = path.join(__dirname, '.env');
-require('dotenv').config({path: envLoc});
 
 class DiscordWebhookEmbed {
     constructor(webhookURL = process.env.DISCORD_WEBHOOK_URL) {

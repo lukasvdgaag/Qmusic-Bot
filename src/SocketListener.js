@@ -113,7 +113,7 @@ class SocketListener {
                                     return;
                                 }
 
-                                webhook.setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480/${data.data.thumbnail}`)
+                                webhook.setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480${data.data.thumbnail}`)
                                 webhook.setFooter('Qmusic - Q sounds better with you!', 'https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png');
 
                                 webhook.addField('Song title', `${title}`, true);
