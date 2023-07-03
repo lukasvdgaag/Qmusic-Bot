@@ -1,6 +1,5 @@
 # Qmusic Bot
-
-*Q sounds better with you*
+![qmusic banner](/assets/qmusic-banner.jpg)
 
 ## About
 
@@ -23,9 +22,25 @@ npm install
 
 Before you can run the bot, you need to configure it.
 
-1. Take the provided `env.example` file and renaming it to `.env`.
-2. Fill in the required values such as your Discord webhook URL and your Qmusic account credentials. You can find your Discord webhook URL by going to your
+1. Take the provided `env.example` file and rename it to `.env`.
+2. Fill in the required values such as your Discord webhook URL. You can find your Discord webhook URL by going to your
    Discord server settings, clicking on "Integrations", and then clicking on "Webhooks".
+3. Create a `tokens.json` file in the root directory and enter your account details in the following format. Make sure to replace the values with your own
+   account details. It is possible to add multiple accounts to the bot by adding more objects to the JSON file. Make sure to identify each account by its email address.
+   The Discord ID is optional, but needed if you want to receive @pings in the Discord server when the bot does something related to you.
+
+### tokens.json file example
+```json
+{
+    "your.email@example.com": {
+        "username": "your.email@example.com",
+        "password": "yourPassword",
+        "discord_id": "your_discord_account_id",
+        "expires": null,
+        "token": null
+    }
+}
+```
 
 ## Running the bot
 
@@ -46,16 +61,19 @@ node index.js
 The bot uses the [Qmusic API](https://api.qmusic.nl) to get the current playing song, upcoming songs, and perform certain account actions.  
 Below is a list of all the API endpoints that are used by the bot.
 
-| Endpoint                             | Method | Description                                                                                                                        | Body                         |
-|--------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
-| **Messages**                         |        |                                                                                                                                    | -                            |
-| `/2.0/messages`                      | GET    | Get the latest messages sent by the user. Add the `?limit=50` param to change the number of messages to retrieve. _Requires auth._ | -                            |
-| `/2.0/messages`                      | POST   | Send a message to the Qmusic studio. _Requires auth._                                                                              | `{"text": "<your message>"}` |
-|                                      |        |                                                                                                                                    | -                            |
-| **Catch The Summerhit**              |        |                                                                                                                                    | -                            |
-| `/2.4/cth/games/17/track_of_the_day` | GET    | Get the current track of the day.                                                                                                  | -                            |
-| `/2.4/cth/games/17/contestant`       | GET    | Get the additional tracks of the week for the contestant. _Requires auth._                                                         | -                            |
-| `/2.4/cth/games/17/catches`          | POST   | Catch a summer hit. _Requires auth._                                                                                               | `{"track_id": "<track id>"}` |
+| Endpoint                             | Method | Description                                                                                                                              | Body                         |
+|--------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
+| **Messages**                         |        |                                                                                                                                          | -                            |
+| `/2.0/messages`                      | GET    | Get the latest messages sent by the user. Add the `?limit=50` param to change the number of messages to retrieve. _Requires auth._       | -                            |
+| `/2.0/messages`                      | POST   | Send a message to the Qmusic studio. _Requires auth._                                                                                    | `{"text": "<your message>"}` |
+|                                      |        |                                                                                                                                          | -                            |
+| **Catch The Summerhit**              |        |                                                                                                                                          | -                            |
+| `/2.4/cth/games/17/`                 | GET    | Get the game information, such as start, end, and score reset dates.                                                                     | -                            |
+| `/2.4/cth/games/17/track_of_the_day` | GET    | Get the current track of the day.                                                                                                        | -                            |
+| `/2.4/cth/games/17/contestant`       | GET    | Get the additional tracks of the week for the contestant. _Requires auth._                                                               | -                            |
+| `/2.4/cth/games/17/catches`          | POST   | Catch a summer hit. _Requires auth._                                                                                                     | `{"track_id": "<track id>"}` |
+| `/2.4/cth/games/17/highscores`       | GET    | Get the highscores for the current week. Add the `?limit=50` param to change the number of top contestants to retrieve. _Requires auth._ | -                            |
+| `/2.4/cth/games/17/code_exchanges`   | POST   | Submit a special codeword to obtain extra points. _Requires auth._                                                                       | `{"code": "<codeword>"}`     |
 
 ## Authentication Process
 
