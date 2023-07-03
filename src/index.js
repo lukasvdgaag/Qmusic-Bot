@@ -1,6 +1,6 @@
-const Socket = require('./Socket');
-const AuthBank = require("./AuthBank");
-const CatchTheSummerHit = require("./CatchTheSummerHit");
+const Socket = require('./SocketListener');
+const AuthBank = require("./auth/AuthBank");
+const CatchTheSummerHit = require("./games/CatchTheSummerHit");
 
 (async () => {
     const authBank = new AuthBank();

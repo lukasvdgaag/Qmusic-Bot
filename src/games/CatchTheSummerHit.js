@@ -1,5 +1,5 @@
 const axios = require('axios');
-const WebhookClient = require("./WebhookClient");
+const WebhookClient = require("../DiscordWebhookEmbed");
 const SummerHitInfo = require("./SummerHitInfo");
 
 class CatchTheSummerHit {

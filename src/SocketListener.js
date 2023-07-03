@@ -1,10 +1,10 @@
 const WebSocketClient = require('websocket').client;
-const WebhookClient = require('./WebhookClient');
+const WebhookClient = require('./DiscordWebhookEmbed');
 
 // const ARTIST_TO_TRACK = 'TAYLOR SWIFT';
 const ARTIST_TO_TRACK = null;
 
-class Socket {
+class SocketListener {
 
     constructor(authBank, catchTheSummerHit) {
         this.authBank = authBank;
@@ -144,4 +144,4 @@ class Socket {
 
 }
 
-module.exports = Socket;
+module.exports = SocketListener;

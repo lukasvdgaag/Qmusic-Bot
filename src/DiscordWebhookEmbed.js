@@ -3,7 +3,7 @@ const path = require("path");
 const envLoc = path.join(__dirname, '.env');
 require('dotenv').config({path: envLoc});
 
-class WebhookClient {
+class DiscordWebhookEmbed {
     constructor(webhookURL = process.env.DISCORD_WEBHOOK_URL) {
         this.webhookURL = webhookURL;
         this.content = "";
@@ -71,4 +71,4 @@ class WebhookClient {
     }
 }
 
-module.exports = WebhookClient;
+module.exports = DiscordWebhookEmbed;
