@@ -37,6 +37,11 @@ class Authenticator {
                 'Accept': '*/*'
             }
         });
+
+        this.#instance.interceptors.request.use(async (config) => {
+            config.headers.Cookie = await this.#cookieJar.getCookieString(config.url);
+            return config;
+        });
     }
 
     /**
@@ -110,6 +115,7 @@ class Authenticator {
 
             return this.#extractBearerTokenFromHtml(response.data);
         } catch (e) {
+            console.error(e);
             return null;
         }
     }

@@ -20,8 +20,8 @@ class AuthBank {
 
         this.users.clear();
 
-        for (const username in this.users) {
-            this.loadUser(jsonUsers[username]);
+        for (const user of Object.values(jsonUsers)) {
+            this.loadUser(user);
         }
     }
 

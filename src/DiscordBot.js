@@ -3,6 +3,7 @@ const {Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBui
 } = require("discord.js");
 const CommandHandler = require("./CommandHandler");
 const CatchTheSummerHit = require("./games/CatchTheSummerHit");
+const SocketListener = require("./SocketListener");
 
 class DiscordBot {
 
@@ -17,8 +18,6 @@ class DiscordBot {
             ]
         });
         this.authBank = authBank;
-        this.catchTheSummerHit = new CatchTheSummerHit(this);
-        this.commandHandler = new CommandHandler(this);
 
         this.#initListeners();
         this.client.login(process.env.DISCORD_TOKEN)
@@ -27,6 +26,10 @@ class DiscordBot {
     #initListeners() {
         this.client.on('ready', () => {
             this.#initCommands()
+
+            this.catchTheSummerHit = new CatchTheSummerHit(this);
+            this.commandHandler = new CommandHandler(this);
+            this.socket = new SocketListener(this);
 
             console.log(`Bot is ready. Logged in as ${this.client.user.tag}`);
         });

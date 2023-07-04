@@ -3,7 +3,7 @@ const SummerHitInfo = require("./SummerHitInfo");
 const {EmbedBuilder} = require("discord.js");
 
 class CatchTheSummerHit {
-    
+
     /**
      * @type {DiscordBot}
      */
@@ -34,13 +34,27 @@ class CatchTheSummerHit {
 
     async checkForNewDay() {
         const today = new Date();
-        const oldDate = new Date(this.trackOfTheDayLastUpdated);
+        const oldDate = new Date(this.trackOfTheDayLastUpdated ?? 0);
 
-        if (today.getUTCFullYear() > oldDate.getUTCFullYear() ||
+        const trackOfTheDayWasNull = this.trackOfTheDay == null;
+        const isNextDay = today.getUTCFullYear() > oldDate.getUTCFullYear() ||
             today.getUTCMonth() > oldDate.getUTCMonth() ||
-            today.getUTCDate() > oldDate.getUTCDate()) {
+            today.getUTCDate() > oldDate.getUTCDate();
+
+        if (trackOfTheDayWasNull || isNextDay) {
             await this.loadTrackOfTheDay();
-            await this.initContestantsTracks();
+            if (isNextDay) await this.initContestantsTracks();
+
+            // check if the track of the day was null and is now not null
+            if (!isNextDay && trackOfTheDayWasNull && this.trackOfTheDay != null) {
+                this.songsCatchers.set(this.trackOfTheDay.track_title, new SummerHitInfo(this.trackOfTheDay));
+                // add all users to the track of the day
+                for (const user of this.#discordBot.authBank.getUsers()) {
+                    if (user.settings.catch_the_summer_hit.enabled) {
+                        this.songsCatchers.get(this.trackOfTheDay.track_title).addUser(user.username);
+                    }
+                }
+            }
         }
     }
 
@@ -51,22 +65,33 @@ class CatchTheSummerHit {
     }
 
     async loadTrackOfTheDay() {
-        const {data} = await axios.get('https://api.qmusic.nl/2.4/cth/games/17/track_of_the_day');
+        try {
+            const response = await axios.get('https://api.qmusic.nl/2.4/cth/games/17/track_of_the_day');
 
-        this.trackOfTheDay = data.track_of_the_day;
-        this.trackOfTheDayLastUpdated = Date.now();
+            if (response.status !== 200) {
+                this.trackOfTheDay = null;
+                this.trackOfTheDayLastUpdated = null;
+                return;
+            }
 
-        let embed = this.#discordBot.commandHandler.getTrackOfTheDayEmbed(this.trackOfTheDay);
-        await this.#discordBot.sendMessage({embeds: [embed]})
+            this.trackOfTheDay = response.data.track_of_the_day;
+            this.trackOfTheDayLastUpdated = Date.now();
+
+            let embed = this.#discordBot.commandHandler.getTrackOfTheDayEmbed(this.trackOfTheDay);
+            await this.#discordBot.sendMessage({embeds: [embed]})
+        } catch (e) {
+            this.trackOfTheDay = null;
+            this.trackOfTheDayLastUpdated = null;
+        }
     }
 
     async initContestantsTracks() {
-        let trackOfTheDayTitle = this.trackOfTheDay.track_title;
+        let trackOfTheDayTitle = this.trackOfTheDay?.track_title;
         const users = this.#discordBot.authBank.getUsers();
 
         // Preparing the song catchers map
         this.songsCatchers.clear();
-        this.songsCatchers.set(trackOfTheDayTitle, new SummerHitInfo(this.trackOfTheDay));
+        if (trackOfTheDayTitle) this.songsCatchers.set(trackOfTheDayTitle, new SummerHitInfo(this.trackOfTheDay));
 
         // Add the users to the song catchers map
         for (const account of users) {
@@ -86,8 +111,10 @@ class CatchTheSummerHit {
         const tracks = contestantInfo.tracks;
 
         // Add the user to the global song
-        let globalHit = this.songsCatchers.get(this.trackOfTheDay.track_title);
-        globalHit?.addUser(username);
+        if (this.trackOfTheDay) {
+            let globalHit = this.songsCatchers.get(this.trackOfTheDay.track_title);
+            globalHit?.addUser(username);
+        }
 
         // Adding all the users' personal songs to the catchers map
         for (const track of tracks) {
