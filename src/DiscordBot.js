@@ -1,4 +1,6 @@
-const {Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction} = require("discord.js");
+const {Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction,
+    SlashCommandUserOption
+} = require("discord.js");
 const CommandHandler = require("./CommandHandler");
 
 class DiscordBot {
@@ -72,7 +74,37 @@ class DiscordBot {
                             .setName('code')
                             .setDescription('The secret code')
                             .setRequired(true)
-                    ))
+                    )),
+            new SlashCommandBuilder()
+                .setName("qmusic")
+                .setDescription("General Qmusic commands")
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('addaccount')
+                    .setDescription('Add your Qmusic account to your Discord account')
+                    .addStringOption(
+                        new SlashCommandStringOption()
+                            .setName('username')
+                            .setDescription('Your Qmusic email address')
+                            .setRequired(true)
+                    ).addStringOption(
+                        new SlashCommandStringOption()
+                            .setName('password')
+                            .setDescription('Your Qmusic password')
+                            .setRequired(true)
+                    ).addUserOption(new SlashCommandUserOption()
+                        .setName('user')
+                        .setDescription('The user that this account belongs to')
+                        .setRequired(false)
+                    )
+                ).addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('removeaccount')
+                    .setDescription('Remove your Qmusic account from your Discord account')
+                    .addUserOption(new SlashCommandUserOption()
+                        .setName('user')
+                        .setDescription('The user to remove the account from')
+                        .setRequired(false)
+                    )
+                )
         ];
 
         this.client.application.commands.set(commands).catch(console.error);
@@ -80,9 +112,21 @@ class DiscordBot {
 
     async handleInteraction(interaction) {
         if (interaction instanceof CommandInteraction) {
-            if (interaction.commandName === 'summerhit') {
+            if (interaction.commandName === 'qmusic') {
                 const subCommand = interaction.options.getSubcommand(false);
 
+                switch (subCommand) {
+                    case 'addaccount':
+                        await this.commandHandler.handleQmusicAddAccountCommand(interaction);
+                        break;
+                    case 'removeaccount':
+                        await this.commandHandler.handleQmusicRemoveAccountCommand(interaction);
+                        break;
+                }
+
+            }
+            else if (interaction.commandName === 'summerhit') {
+                const subCommand = interaction.options.getSubcommand(false);
 
                 switch (subCommand) {
                     case 'about':

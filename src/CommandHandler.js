@@ -173,6 +173,35 @@ class CommandHandler {
         await interaction.reply({embeds: [embed]});
     }
 
+    async handleQmusicAddAccountCommand(interaction) {
+        let userId = interaction.user.id;
+
+        const username = interaction.options.getString('username');
+        const password = interaction.options.getString('password');
+        const discordUser = interaction.options.getUser('discord-user');
+
+        if (discordUser != null) {
+            userId = discordUser.id;
+        }
+
+        const user = this.authBank.getUser(username);
+        if (user != null) {
+            await this.sendAccountAlreadyLinkedMessage(interaction);
+            return;
+        }
+
+        await this.authBank.addUser(username, password, userId);
+
+        const userInfo = this.authBank.getLoginInfo(username);
+        if (userInfo == null || userInfo.bearerToken == null) {
+            await this.sendInvalidCredentialsMessage(interaction);
+            await this.authBank.removeUser(username);
+            return;
+        }
+
+        await this.sendAccountLinkedMessage(interaction, username, userId);
+    }
+
     getPersonalTracksList(contestantInfo) {
         const tracks = contestantInfo.tracks;
         let message = '';
@@ -247,10 +276,53 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
+    async sendAccountLinkedMessage(interaction, username, userId) {
+        const embed = new EmbedBuilder()
+            .setTitle("✅ Account linked")
+            .setDescription(`A Qmusic account with the username \`${username}\` has been successfully linked to <@${userId}>'s Discord account. You can now use the other Qmusic commands.`)
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        // reply with ephemeral message
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }
+
+    async sendAccountAlreadyLinkedMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("🔒 Account already added")
+            .setDescription("This Qmusic account is already known by the bot. If you want to replace this account or change it credentials, please remove the account first. " +
+                "You can do this by using the \u003C/qmusic removeaccount:1125771007748210728> command.")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        // reply with ephemeral message
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }
+
+    async sendInvalidCredentialsMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("🔒 Invalid credentials")
+            .setDescription("The credentials you provided were invalid. Please check if you entered the correct username (email) and password and try again.")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        // reply with ephemeral message
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }
+
     async sendUnauthorizedMessage(interaction) {
         const embed = new EmbedBuilder()
             .setTitle("🔒 No account found")
-            .setDescription("No Qmusic account was found in the saved accounts list. In order to use this command, please link your account first with the `/qmusic addacount` command or ask an admin to do this for you.\n\n" +
+            .setDescription("No Qmusic account was found in the saved accounts list. In order to use this command, please link your account first with the `/qmusic addaccount` command or ask an admin to do this for you.\n\n" +
                 "*Please note that in order to link your account, you need to provide your __username__ (email) and __password__. Only share this with people you trust.*")
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
