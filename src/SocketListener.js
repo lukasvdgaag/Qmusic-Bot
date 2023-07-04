@@ -1,14 +1,18 @@
 const WebSocketClient = require('websocket').client;
-const WebhookClient = require('./DiscordWebhookEmbed');
+const {EmbedBuilder} = require("discord.js");
 
 // const ARTIST_TO_TRACK = 'TAYLOR SWIFT';
 const ARTIST_TO_TRACK = null;
 
 class SocketListener {
 
-    constructor(authBank, catchTheSummerHit) {
-        this.authBank = authBank;
-        this.catchTheSummerHit = catchTheSummerHit;
+    /**
+     * @type {DiscordBot}
+     */
+    #discordBot;
+
+    constructor(discordBot) {
+        this.#discordBot = discordBot;
         this.messages = [
             `["{\\"action\\":\\"join\\",\\"id\\":3,\\"sub\\":{\\"station\\":\\"qmusic_nl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
         ]
@@ -24,11 +28,12 @@ class SocketListener {
         })
 
         this.client.on('connect', (connection) => {
-            const embed = new WebhookClient();
-            embed.setTitle('Connected to websocket');
-            embed.setColor(0x7ed90e);
-            embed.setDescription(`The connection to the Qmusic websocket has been established. Monitoring the Catch The Summer Hit game for ${this.authBank.loginInfos.size} users.`);
-            embed.send();
+            const embed = new EmbedBuilder()
+                .setTitle('Connected to websocket')
+                .setColor("#7ed90e")
+                .setDescription(`The connection to the Qmusic websocket has been established. Monitoring the Catch The Summer Hit game for ${this.#discordBot.authBank.users.size} users.`);
+
+            this.#discordBot.sendMessage({embeds: [embed]}).catch(console.log);
 
             for (const message of this.messages) {
                 connection.sendUTF(message);
@@ -39,11 +44,12 @@ class SocketListener {
             });
 
             connection.on('close', () => {
-                const embed = new WebhookClient();
-                embed.setTitle('Connection to websocket closed');
-                embed.setColor(0xeb3424);
-                embed.setDescription('The connection to the Qmusic websocket has been closed. Trying to reconnect...');
-                embed.send();
+                const embed = new EmbedBuilder()
+                    .setTitle('Connection to websocket closed')
+                    .setColor("#eb3424")
+                    .setDescription(`The connection to the Qmusic websocket has been closed. Trying to reconnect...`);
+
+                this.#discordBot.sendMessage({embeds: [embed]}).catch(console.log);
 
                 this.init();
             });
@@ -70,29 +76,12 @@ class SocketListener {
                                 const title = data.data.title;
                                 let artist = data.data.artist.name;
 
+                                // Check if the song needs to be caught
+                                this.#discordBot.catchTheSummerHit.checkForCatches(title, artist).catch(console.log);
+
+                                /*
                                 const webhook = new WebhookClient();
                                 let listenLive = false;
-
-                                setTimeout(async () => {
-                                    const catchedUsers = await this.catchTheSummerHit.catchSong(title, artist);
-                                    if (catchedUsers.length > 0) {
-                                        let userMentionString = '';
-
-                                        for (const username of catchedUsers) {
-                                            const discord = this.authBank.getUser(username)?.discord_id;
-                                            if (discord) userMentionString += `<@${discord}> `;
-                                        }
-
-                                        const embed = new WebhookClient();
-                                        if (userMentionString.length > 0) embed.setContent(`${userMentionString} I caught the Summer Hit: ${title} by ${artist}`);
-                                        embed.setTitle(`Catched Summer Hit`);
-                                        embed.addField('Title', title, true);
-                                        embed.addField('Artist', artist, true);
-                                        embed.addField('Points', `+${this.catchTheSummerHit.songsCatchers.get(title).points} points`, true);
-                                        embed.addField('Catched for', catchedUsers.join(', '));
-                                        embed.send();
-                                    }
-                                }, 1000 * 10)
 
                                 if (ARTIST_TO_TRACK && data.data.next?.artist.name.includes(ARTIST_TO_TRACK)) {
                                     webhook.setContent(`@everyone **${ARTIST_TO_TRACK}** is coming up next on Qmusic. Get your app ready!!`);
@@ -121,7 +110,7 @@ class SocketListener {
                                 if (data.data?.next) webhook.addField('Up next', `${data.data.next?.title} - ${data.data.next?.artist?.name}`, false);
                                 if (listenLive) webhook.addField('Listen live', 'https://qmusic.nl/luister/qmusic_nl', false)
 
-                                webhook.send();
+                                webhook.send();*/
                             }
                         }
                     } catch (e) {

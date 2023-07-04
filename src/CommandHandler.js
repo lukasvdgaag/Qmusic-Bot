@@ -3,13 +3,10 @@ const {EmbedBuilder} = require("discord.js");
 class CommandHandler {
 
     /**
-     *
-     * @param {AuthBank} authBank
-     * @param {CatchTheSummerHit} catchTheSummerHit
+     * @param {DiscordBot} discordBot
      */
-    constructor(authBank, catchTheSummerHit) {
-        this.authBank = authBank;
-        this.catchTheSummerHit = catchTheSummerHit;
+    constructor(discordBot) {
+        this.discordBot = discordBot;
     }
 
     async handleSummerHitAboutCommand(interaction) {
@@ -52,11 +49,161 @@ class CommandHandler {
 
     async handleSummerHitTrackOfTheDayCommand(interaction) {
         // Check if the track of the day needs to be updated
-        await this.catchTheSummerHit.checkForNewDay();
+        await this.discordBot.catchTheSummerHit.checkForNewDay();
 
-        const trackOfTheDay = this.catchTheSummerHit.trackOfTheDay;
+        const trackOfTheDay = this.discordBot.catchTheSummerHit.trackOfTheDay;
+        const embed = this.getTrackOfTheDayEmbed(trackOfTheDay);
+
+        await interaction.reply({embeds: [embed]});
+    }
+
+    async handleSummerHitStatsCommand(interaction) {
+        const userId = interaction.user.id;
+
+        const user = this.discordBot.authBank.getUserByDiscordId(userId);
+        if (user == null) {
+            await this.#sendUnauthorizedMessage(interaction);
+            return;
+        }
+
+        const contestantInfo = await this.discordBot.catchTheSummerHit.getContestantInfo(user.username);
+        if (!contestantInfo) {
+            await this.#sendGameUnavailableMessage(interaction);
+            return;
+        }
+
+        // Checking that if the user just started the game, the songs are initialized
+        const trackingUsers = this.discordBot.catchTheSummerHit.songsCatchers.get(this.discordBot.catchTheSummerHit.trackOfTheDay.track_title);
+        if (!trackingUsers.getUsers().includes(user.username)) {
+            await this.discordBot.catchTheSummerHit.initContestantTracks(user.username);
+        }
+
+        const userLeaderboard = await this.discordBot.catchTheSummerHit.getHighscoresForUser(user.username, 2);
+
+        let multiplierValue = contestantInfo.multiplier.value;
+        let multiplierExpiryDate = new Date(contestantInfo.multiplier.expires_at).getTime() / 1000;
+        let userLeaderboardRank = userLeaderboard.me.rank;
 
         const embed = new EmbedBuilder()
+            .setTitle("🏝️ Catch The Summer Hit Stats")
+            .setDescription(`<@${userId}>'s Catch The Summer Hit stats for this week.`)
+            .addFields({
+                name: 'Score',
+                value: `${contestantInfo.score} points`,
+                inline: true
+            }, {
+                name: 'Current Multiplier',
+                value: `${multiplierValue}x - expires at <t:${multiplierExpiryDate}>`,
+                inline: true
+            }, {
+                name: 'Leaderboard Position',
+                value: this.#numberToEmojis(userLeaderboardRank) + (userLeaderboardRank <= 5 ? ' 🏆' : ''),
+                inline: true
+            }, {
+                name: 'Your Tracks',
+                value: this.#getPersonalTracksList(contestantInfo),
+                inline: false
+            })
+            .setColor(process.env.MAIN_COLOR)
+
+        await interaction.reply({embeds: [embed]});
+    }
+
+    async handleSummerHitLeaderboardCommand(interaction) {
+        const userId = interaction.user.id;
+
+        const user = this.discordBot.authBank.getUserByDiscordId(userId);
+        if (user == null) {
+            await this.#sendUnauthorizedMessage(interaction);
+            return;
+        }
+
+        const contestantInfo = await this.discordBot.catchTheSummerHit.getContestantInfo(user.username);
+        if (!contestantInfo) {
+            await this.#sendGameUnavailableMessage(interaction);
+            return;
+        }
+
+        const count = interaction.options.getInteger('count') || 10;
+        const userLeaderboard = await this.discordBot.catchTheSummerHit.getHighscoresForUser(user.username, count);
+
+        let userLeaderboardRank = userLeaderboard.me.rank;
+
+        const embed = new EmbedBuilder()
+            .setTitle("🏝️ Catch The Summer Hit Stats")
+            .setDescription(`<@${userId}>'s Catch The Summer Hit stats for this week.`)
+            .addFields({
+                name: 'Your Score',
+                value: `${userLeaderboard.me.score} points`,
+                inline: true
+            }, {
+                name: 'Your Rank',
+                value: this.#numberToEmojis(userLeaderboardRank) + (userLeaderboardRank <= 5 ? ' 🏆' : ''),
+                inline: true
+            }, {
+                name: `Top ${count} Leaderboard`,
+                value: this.#getLeaderboardUsers(userLeaderboard.top),
+                inline: false
+            })
+            .setColor(process.env.MAIN_COLOR)
+
+        await interaction.reply({embeds: [embed]});
+    }
+
+    async handleQmusicAddAccountCommand(interaction) {
+        let userId = interaction.options.getUser('user')?.id ?? interaction.user.id;
+
+        const username = interaction.options.getString('username');
+        const password = interaction.options.getString('password');
+
+        let user = this.discordBot.authBank.getUser(username);
+        if (user != null) {
+            await this.#sendAccountAlreadyLinkedMessage(interaction);
+            return;
+        }
+
+        user = await this.discordBot.authBank.addUser(username, password, userId, true);
+
+        // Refreshing the token to make sure it's valid
+        if (user) await this.discordBot.authBank.refreshUserToken(username, true, true);
+
+        if (!user || !user.token) {
+            await this.#sendInvalidCredentialsMessage(interaction);
+            await this.discordBot.authBank.removeUser(username);
+            return;
+        }
+
+        await this.#sendAccountLinkedMessage(interaction, username, userId);
+    }
+
+    async handleQmusicRemoveAccountCommand(interaction) {
+        let userId = interaction.user.id;
+
+        const username = interaction.options.getString('username');
+
+        let user;
+        if (username) {
+            user = this.discordBot.authBank.getUser(username);
+            if (user == null) {
+                await this.#sendNoAccountFoundMessage(interaction, username);
+                return;
+            }
+        } else {
+            user = this.discordBot.authBank.getUserByDiscordId(userId);
+            if (user == null) {
+                await this.#sendUnauthorizedMessage(interaction);
+                return;
+            }
+        }
+
+        await this.discordBot.authBank.removeUser(user.username);
+        this.discordBot.catchTheSummerHit.removeUser(user.username);
+
+        await this.#sendAccountRemovedMessage(interaction, user.username);
+    }
+
+    getTrackOfTheDayEmbed(trackOfTheDay) {
+        return new EmbedBuilder()
             .setTitle("🎺 Track of the Day")
             .addFields({
                 name: 'Title',
@@ -76,156 +223,9 @@ class CommandHandler {
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             });
-
-        await interaction.reply({embeds: [embed]});
     }
 
-    async handleSummerHitStatsCommand(interaction) {
-        const userId = interaction.user.id;
-
-        const user = this.authBank.getUserByDiscordId(userId);
-        if (user == null) {
-            await this.sendUnauthorizedMessage(interaction);
-            return;
-        }
-
-        const contestantInfo = await this.catchTheSummerHit.getContestantInfo(user.username);
-        if (!contestantInfo) {
-            await this.sendGameUnavailableMessage(interaction);
-            return;
-        }
-
-        // Checking that if the user just started the game, the songs are initialized
-        const trackingUsers = this.catchTheSummerHit.songsCatchers.get(this.catchTheSummerHit.trackOfTheDay.track_title);
-        if (!trackingUsers.getUsers().includes(user.username)) {
-            await this.catchTheSummerHit.initContestantTracks(user.username);
-        }
-
-        const userLeaderboard = await this.catchTheSummerHit.getHighscoresForUser(user.username, 2);
-
-        let multiplierValue = contestantInfo.multiplier.value;
-        let multiplierExpiryDate = new Date(contestantInfo.multiplier.expires_at).getTime() / 1000;
-        let userLeaderboardRank = userLeaderboard.me.rank;
-
-        const embed = new EmbedBuilder()
-            .setTitle("🏝️ Catch The Summer Hit Stats")
-            .setDescription(`<@${userId}>'s Catch The Summer Hit stats for this week.`)
-            .addFields({
-                name: 'Score',
-                value: `${contestantInfo.score} points`,
-                inline: true
-            }, {
-                name: 'Current Multiplier',
-                value: `${multiplierValue}x - expires at <t:${multiplierExpiryDate}>`,
-                inline: true
-            }, {
-                name: 'Leaderboard Position',
-                value: this.numberToEmojis(userLeaderboardRank) + (userLeaderboardRank <= 5 ? ' 🏆' : ''),
-                inline: true
-            }, {
-                name: 'Your Tracks',
-                value: this.getPersonalTracksList(contestantInfo),
-                inline: false
-            })
-            .setColor(process.env.MAIN_COLOR)
-
-        await interaction.reply({embeds: [embed]});
-    }
-
-    async handleSummerHitLeaderboardCommand(interaction) {
-        const userId = interaction.user.id;
-
-        const user = this.authBank.getUserByDiscordId(userId);
-        if (user == null) {
-            await this.sendUnauthorizedMessage(interaction);
-            return;
-        }
-
-        const contestantInfo = await this.catchTheSummerHit.getContestantInfo(user.username);
-        if (!contestantInfo) {
-            await this.sendGameUnavailableMessage(interaction);
-            return;
-        }
-
-        const count = interaction.options.getInteger('count') || 10;
-        const userLeaderboard = await this.catchTheSummerHit.getHighscoresForUser(user.username, count);
-
-        let userLeaderboardRank = userLeaderboard.me.rank;
-
-        const embed = new EmbedBuilder()
-            .setTitle("🏝️ Catch The Summer Hit Stats")
-            .setDescription(`<@${userId}>'s Catch The Summer Hit stats for this week.`)
-            .addFields({
-                name: 'Your Score',
-                value: `${userLeaderboard.me.score} points`,
-                inline: true
-            }, {
-                name: 'Your Rank',
-                value: this.numberToEmojis(userLeaderboardRank) + (userLeaderboardRank <= 5 ? ' 🏆' : ''),
-                inline: true
-            }, {
-                name: `Top ${count} Leaderboard`,
-                value: this.getLeaderboardUsers(userLeaderboard.top),
-                inline: false
-            })
-            .setColor(process.env.MAIN_COLOR)
-
-        await interaction.reply({embeds: [embed]});
-    }
-
-    async handleQmusicAddAccountCommand(interaction) {
-        let userId = interaction.options.getUser('user')?.id ?? interaction.user.id;
-
-        const username = interaction.options.getString('username');
-        const password = interaction.options.getString('password');
-
-        const user = this.authBank.getUser(username);
-        if (user != null) {
-            await this.sendAccountAlreadyLinkedMessage(interaction);
-            return;
-        }
-
-        await this.authBank.addUser(username, password, userId, true);
-
-        const userInfo = this.authBank.getLoginInfo(username);
-        if (userInfo) await this.authBank.refreshUserToken(username, true, true);
-
-        if (userInfo == null || userInfo.bearerToken == null) {
-            await this.sendInvalidCredentialsMessage(interaction);
-            await this.authBank.removeUser(username);
-            return;
-        }
-
-        await this.sendAccountLinkedMessage(interaction, username, userId);
-    }
-
-    async handleQmusicRemoveAccountCommand(interaction) {
-        let userId = interaction.user.id;
-
-        const username = interaction.options.getString('username');
-
-        let user;
-        if (username) {
-            user = this.authBank.getUser(username);
-            if (user == null) {
-                await this.sendNoAccountFoundMessage(interaction, username);
-                return;
-            }
-        } else {
-            user = this.authBank.getUserByDiscordId(userId);
-            if (user == null) {
-                await this.sendUnauthorizedMessage(interaction);
-                return;
-            }
-        }
-
-        await this.authBank.removeUser(user.username);
-        this.catchTheSummerHit.removeUser(user.username);
-
-        await this.sendAccountRemovedMessage(interaction, user.username);
-    }
-
-    getPersonalTracksList(contestantInfo) {
+    #getPersonalTracksList(contestantInfo) {
         const tracks = contestantInfo.tracks;
         let message = '';
 
@@ -239,7 +239,7 @@ class CommandHandler {
         return message;
     }
 
-    getLeaderboardUsers(leaderboard) {
+    #getLeaderboardUsers(leaderboard) {
         let message = '';
 
         for (let i = 0; i < leaderboard.length; i++) {
@@ -256,7 +256,7 @@ class CommandHandler {
         return message;
     }
 
-    numberToEmojis(number) {
+    #numberToEmojis(number) {
         const emojiMap = {
             0: '0️⃣',
             1: '1️⃣',
@@ -283,7 +283,7 @@ class CommandHandler {
         return result;
     }
 
-    async sendGameUnavailableMessage(interaction) {
+    async #sendGameUnavailableMessage(interaction) {
         const embed = new EmbedBuilder()
             .setTitle("🔒 Game unavailable")
             .setDescription("This game is currently unavailable to you. This is likely due to the fact that you have not started the game yet in your app. " +
@@ -299,7 +299,7 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
-    async sendAccountLinkedMessage(interaction, username, userId) {
+    async #sendAccountLinkedMessage(interaction, username, userId) {
         const embed = new EmbedBuilder()
             .setTitle("✅ Account linked")
             .setDescription(`A Qmusic account with the username \`${username}\` has been successfully linked to <@${userId}>'s Discord account. They can now use the other Qmusic commands.`)
@@ -313,7 +313,7 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
-    async sendAccountAlreadyLinkedMessage(interaction) {
+    async #sendAccountAlreadyLinkedMessage(interaction) {
         const embed = new EmbedBuilder()
             .setTitle("🔒 Account already added")
             .setDescription("This Qmusic account is already known by the bot. If you want to replace this account or change it credentials, please remove the account first. " +
@@ -328,7 +328,7 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
-    async sendInvalidCredentialsMessage(interaction) {
+    async #sendInvalidCredentialsMessage(interaction) {
         const embed = new EmbedBuilder()
             .setTitle("🔒 Invalid credentials")
             .setDescription("The credentials you provided were invalid. Please check if you entered the correct username (email) and password and try again.")
@@ -342,7 +342,7 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
-    async sendAccountRemovedMessage(interaction, username) {
+    async #sendAccountRemovedMessage(interaction, username) {
         const embed = new EmbedBuilder()
             .setTitle("✅ Account removed")
             .setDescription(`The Qmusic account with the username \`${username}\` has been successfully removed from the bot.`)
@@ -356,7 +356,7 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
-    async sendNoAccountFoundMessage(interaction, username) {
+    async #sendNoAccountFoundMessage(interaction, username) {
         const embed = new EmbedBuilder()
             .setTitle("🔒 No account found")
             .setDescription(`No Qmusic account was found with the username \`${username}\`. You can add their account` +
@@ -372,7 +372,7 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
-    async sendUnauthorizedMessage(interaction) {
+    async #sendUnauthorizedMessage(interaction) {
         const embed = new EmbedBuilder()
             .setTitle("🔒 No account found")
             .setDescription("No Qmusic account was found in the saved accounts list. In order to use this command, please link your account first " +

@@ -1,11 +1,12 @@
 const {Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction,
-    SlashCommandUserOption
+    SlashCommandUserOption, MessagePayload
 } = require("discord.js");
 const CommandHandler = require("./CommandHandler");
+const CatchTheSummerHit = require("./games/CatchTheSummerHit");
 
 class DiscordBot {
 
-    constructor(authBank, catchTheSummerHit) {
+    constructor(authBank) {
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -15,31 +16,36 @@ class DiscordBot {
                 GatewayIntentBits.MessageContent,
             ]
         });
-        this.commandHandler = new CommandHandler(authBank, catchTheSummerHit);
+        this.authBank = authBank;
+        this.catchTheSummerHit = new CatchTheSummerHit(this);
+        this.commandHandler = new CommandHandler(this);
 
-        this.initListeners();
+        this.#initListeners();
         this.client.login(process.env.DISCORD_TOKEN)
     }
 
-    initListeners() {
+    #initListeners() {
         this.client.on('ready', () => {
-            this.initCommands()
+            this.#initCommands()
 
             console.log(`Bot is ready. Logged in as ${this.client.user.tag}`);
         });
 
         this.client.on('interactionCreate', async interaction => {
-            await this.handleInteraction(interaction);
+            await this.#handleInteraction(interaction);
         })
     }
 
-    initCommands() {
+    #initCommands() {
         /*
         /summerhit about
         /summerhit trackoftheday
         /summerhit stats
         /summerhit leaderboard [count]
         /summerhit entercode <code>
+
+        /qmusic addaccount <username> <password> [user]
+        /qmusic removeaccount [username]
          */
         const commands = [
             new SlashCommandBuilder()
@@ -110,7 +116,7 @@ class DiscordBot {
         this.client.application.commands.set(commands).catch(console.error);
     }
 
-    async handleInteraction(interaction) {
+    async #handleInteraction(interaction) {
         if (interaction instanceof CommandInteraction) {
             if (interaction.commandName === 'qmusic') {
                 const subCommand = interaction.options.getSubcommand(false);
@@ -149,6 +155,18 @@ class DiscordBot {
             }
         }
 
+    }
+
+    /**
+     * Send a message to a channel
+     * @param {string|MessagePayload} message The message to send
+     * @param {string} channelId The ID of the channel to send the message to
+     * @returns {Promise<Message<true>>}
+     */
+    async sendMessage(message, channelId = process.env.DISCORD_CHANNEL_ID) {
+        const channel = this.client.channels.cache.get(channelId) ?? await this.client.channels.fetch(channelId);
+
+        return await channel.send(message);
     }
 
 }

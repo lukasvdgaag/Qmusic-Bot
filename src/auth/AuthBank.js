@@ -1,86 +1,107 @@
 const path = require("path");
 const fs = require("fs").promises;
 const jwt = require("jsonwebtoken");
-const LoginInfo = require("./LoginInfo");
+const Account = require("./Account");
+const Authenticator = require("./Authenticator");
 
 class AuthBank {
 
     constructor() {
         this.filepath = path.resolve(__dirname, "../tokens.json");
-        this.users = {};
-
-        this.loginInfos = new Map();
+        /**
+         * @type {Map<string, Account>}
+         */
+        this.users = new Map();
     }
 
     async loadUsers() {
         const data = await fs.readFile(this.filepath, 'utf8');
-        this.users = JSON.parse(data);
+        const jsonUsers = JSON.parse(data);
+
+        this.users.clear();
 
         for (const username in this.users) {
-            this.loadUser(username);
+            this.loadUser(jsonUsers[username]);
         }
     }
 
+    /**
+     * Add a new user to the bot
+     * @param username Username of the account
+     * @param password Password of the account
+     * @param discord_id Discord ID of the user
+     * @param save Whether to save the changes to the file
+     * @returns {Promise<Account|boolean>} The created account or false if the user already exists
+     */
     async addUser(username, password, discord_id = null, save = false) {
-        if (this.users[username]) return false;
+        if (this.getUser(username)) return false;
 
-        this.users[username] = {
+        const userData = {
             username,
             password,
             discord_id,
-            token: null,
-            expires: null,
         }
 
-        this.loadUser(username);
+        const addedUser = this.loadUser(userData);
         if (save) await this.saveUsers();
-        return true;
+        return addedUser;
     }
 
     async removeUser(username) {
-        if (!this.users[username]) return false;
+        if (!this.getUser(username)) return false;
 
-        delete this.users[username];
-        this.loginInfos.delete(username);
+        this.users.delete(username);
         await this.saveUsers();
 
         return true;
     }
 
-    loadUser(username) {
-        const user = this.users[username];
-        if (!user) return false;
-
-        this.loginInfos.set(username, new LoginInfo(user.username, user.password, user?.token ?? null));
-        return true;
+    /**
+     * @param jsonUser
+     * @returns {Account}
+     */
+    loadUser(jsonUser) {
+        let account = new Account(jsonUser);
+        this.users.set(jsonUser.username, account);
+        return account;
     }
 
+    /**
+     * @param username
+     * @returns {Account}
+     */
     getUser(username) {
-        return this.users[username];
+        return this.users.get(username);
+    }
+
+    /**
+     * Get all users
+     * @returns {IterableIterator<Account>}
+     */
+    getUsers() {
+        return this.users.values();
     }
 
     getUserByDiscordId(discordId) {
-        for (const user of Object.values(this.users)) {
+        for (const user of this.users.values()) {
             if (user.discord_id === discordId) return user;
         }
         return null;
     }
 
-    /**
-     * @param {string} username
-     * @returns {LoginInfo}
-     */
-    getLoginInfo(username) {
-        return this.loginInfos.get(username);
-    }
-
     async saveUsers() {
-        const data = JSON.stringify(this.users, null, 2);
+        const json = {};
+
+        for (const user of this.users.values()) {
+            json[user.username] = user;
+        }
+
+        const data = JSON.stringify(json, null, 2);
         await fs.writeFile(this.filepath, data, 'utf8');
     }
 
     isTokenExpired(token) {
-        const exp = this.getTokenExpirationDate(token);
+        const exp = this.#getTokenExpirationDate(token);
 
         // If there is no expiration date, the token is invalid
         if (!exp) return true;
@@ -90,7 +111,7 @@ class AuthBank {
         return exp < currentTime + 3600;
     }
 
-    getTokenExpirationDate(token) {
+    #getTokenExpirationDate(token) {
         const decoded = jwt.decode(token);
         const exp = decoded && decoded.exp;
 
@@ -98,42 +119,35 @@ class AuthBank {
         return exp ?? null;
     }
 
-    async generateNewToken(username) {
-        let loginInfo = this.getLoginInfo(username);
-        if (!loginInfo) {
-            // Try to load the user
-            if (!this.loadUser(username)) return null;
+    async #generateNewToken(username) {
+        let user = this.getUser(username);
+        if (!user) return null;
 
-            loginInfo = this.getLoginInfo(username);
-        }
-
-        return await loginInfo.processLogin();
+        return await new Authenticator().processLogin(user.username, user.password);
     }
 
     async refreshTokens() {
         await this.loadUsers();
-        for (const user of this.loginInfos.values()) {
+        for (const user of this.users.values()) {
             await this.refreshUserToken(user.username, false);
         }
         await this.saveUsers();
     }
 
-    async refreshUserToken(username, save=true, force=false) {
-        const user = this.getLoginInfo(username);
+    async refreshUserToken(username, save = true, force = false) {
+        const user = this.getUser(username);
         if (user == null) return;
 
-        if (force || !user.bearerToken || this.isTokenExpired(user.bearerToken)) {
-            await this.generateNewToken(user.username);
+        if (force || !user.token || this.isTokenExpired(user.token)) {
+            user.token = await this.#generateNewToken(user.username);
         }
 
-        const jsonUser = this.getUser(user.username);
-        jsonUser.token = user.bearerToken;
-        jsonUser.expires = this.getTokenExpirationDate(user.bearerToken);
+        user.expires = this.#getTokenExpirationDate(user.token);
 
         if (save) await this.saveUsers();
 
         const currentTime = Math.floor(Date.now() / 1000);
-        const timeToRefresh = Math.max(0, jsonUser.expires - currentTime - 600);
+        const timeToRefresh = Math.max(0, user.expires - currentTime - 600);
         console.log(`Next refresh for ${username} in ${timeToRefresh} seconds`);
         setTimeout(async () => {
             await this.refreshUserToken(username, true, true);

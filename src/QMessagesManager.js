@@ -12,7 +12,7 @@ class QMessagesManager {
 
     /**
      * Get the latest messages for a given user.
-     * @param {LoginInfo} loginInfo User login information to use for the request.
+     * @param {Authenticator} loginInfo User login information to use for the request.
      * @param {number} limit The maximum amount of messages to retrieve.
      * @returns {Promise<void>}
      */
@@ -29,7 +29,7 @@ class QMessagesManager {
 
     /**
      * Send a message to the Qmusic API as a given user.
-     * @param {LoginInfo} loginInfo User login information to use for the request.
+     * @param {Authenticator} loginInfo User login information to use for the request.
      * @param {string} message The message to send.
      * @returns {Promise<axios.AxiosResponse>}
      */
