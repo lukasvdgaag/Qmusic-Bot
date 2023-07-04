@@ -66,6 +66,10 @@ class AuthBank {
         return null;
     }
 
+    /**
+     * @param {string} username
+     * @returns {LoginInfo}
+     */
     getLoginInfo(username) {
         return this.loginInfos.get(username);
     }

@@ -11,7 +11,11 @@ class SummerHitInfo {
     }
 
     addUser(username) {
-        this.users.push(username);
+        if (!this.users.includes(username)) this.users.push(username);
+    }
+
+    removeUser(username) {
+        this.users = this.users.filter(user => user !== username);
     }
 
     getUsers() {

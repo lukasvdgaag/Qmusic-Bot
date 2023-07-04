@@ -21,10 +21,10 @@ class CatchTheSummerHit {
         await this.loadTrackOfTheDay();
         await this.initContestantsTracks();
 
-        // start an interval that checks if it's the next day every hour
+        // start an interval that checks if it's the next day every 5 minutes
         setInterval(async () => {
             await this.checkForNewDay();
-        }, 1000 * 60 * 60);
+        }, 1000 * 60 * 5);
     }
 
     async checkForNewDay() {
@@ -37,6 +37,12 @@ class CatchTheSummerHit {
             await this.loadTrackOfTheDay();
             await this.initContestantsTracks();
         }
+    }
+
+    removeUser(username) {
+        this.songsCatchers.forEach((value, key) => {
+            value.removeUser(username);
+        });
     }
 
     async loadTrackOfTheDay() {

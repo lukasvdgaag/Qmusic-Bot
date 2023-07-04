@@ -174,15 +174,10 @@ class CommandHandler {
     }
 
     async handleQmusicAddAccountCommand(interaction) {
-        let userId = interaction.user.id;
+        let userId = interaction.options.getUser('user')?.id ?? interaction.user.id;
 
         const username = interaction.options.getString('username');
         const password = interaction.options.getString('password');
-        const discordUser = interaction.options.getUser('discord-user');
-
-        if (discordUser != null) {
-            userId = discordUser.id;
-        }
 
         const user = this.authBank.getUser(username);
         if (user != null) {
@@ -190,9 +185,11 @@ class CommandHandler {
             return;
         }
 
-        await this.authBank.addUser(username, password, userId);
+        await this.authBank.addUser(username, password, userId, true);
 
         const userInfo = this.authBank.getLoginInfo(username);
+        if (userInfo) await this.authBank.refreshUserToken(username, true, true);
+
         if (userInfo == null || userInfo.bearerToken == null) {
             await this.sendInvalidCredentialsMessage(interaction);
             await this.authBank.removeUser(username);
@@ -200,6 +197,32 @@ class CommandHandler {
         }
 
         await this.sendAccountLinkedMessage(interaction, username, userId);
+    }
+
+    async handleQmusicRemoveAccountCommand(interaction) {
+        let userId = interaction.user.id;
+
+        const username = interaction.options.getString('username');
+
+        let user;
+        if (username) {
+            user = this.authBank.getUser(username);
+            if (user == null) {
+                await this.sendNoAccountFoundMessage(interaction, username);
+                return;
+            }
+        } else {
+            user = this.authBank.getUserByDiscordId(userId);
+            if (user == null) {
+                await this.sendUnauthorizedMessage(interaction);
+                return;
+            }
+        }
+
+        await this.authBank.removeUser(user.username);
+        this.catchTheSummerHit.removeUser(user.username);
+
+        await this.sendAccountRemovedMessage(interaction, user.username);
     }
 
     getPersonalTracksList(contestantInfo) {
@@ -279,7 +302,7 @@ class CommandHandler {
     async sendAccountLinkedMessage(interaction, username, userId) {
         const embed = new EmbedBuilder()
             .setTitle("✅ Account linked")
-            .setDescription(`A Qmusic account with the username \`${username}\` has been successfully linked to <@${userId}>'s Discord account. You can now use the other Qmusic commands.`)
+            .setDescription(`A Qmusic account with the username \`${username}\` has been successfully linked to <@${userId}>'s Discord account. They can now use the other Qmusic commands.`)
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
@@ -319,10 +342,41 @@ class CommandHandler {
         await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
+    async sendAccountRemovedMessage(interaction, username) {
+        const embed = new EmbedBuilder()
+            .setTitle("✅ Account removed")
+            .setDescription(`The Qmusic account with the username \`${username}\` has been successfully removed from the bot.`)
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        // reply with ephemeral message
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }
+
+    async sendNoAccountFoundMessage(interaction, username) {
+        const embed = new EmbedBuilder()
+            .setTitle("🔒 No account found")
+            .setDescription(`No Qmusic account was found with the username \`${username}\`. You can add their account` +
+                `with the \u003C/qmusic addaccount:1125771007748210728> command or ask an admin to do this for you.\n\n` +
+                "*Please note that in order to link your account, you need to provide your __username__ (email) and __password__. Only share this with people you trust.*")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        // reply with ephemeral message
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }
+
     async sendUnauthorizedMessage(interaction) {
         const embed = new EmbedBuilder()
             .setTitle("🔒 No account found")
-            .setDescription("No Qmusic account was found in the saved accounts list. In order to use this command, please link your account first with the `/qmusic addaccount` command or ask an admin to do this for you.\n\n" +
+            .setDescription("No Qmusic account was found in the saved accounts list. In order to use this command, please link your account first " +
+                "with the \u003C/qmusic addaccount:1125771007748210728> command or ask an admin to do this for you.\n\n" +
                 "*Please note that in order to link your account, you need to provide your __username__ (email) and __password__. Only share this with people you trust.*")
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
