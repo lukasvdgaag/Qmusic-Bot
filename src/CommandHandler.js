@@ -73,9 +73,11 @@ class CommandHandler {
         }
 
         // Checking that if the user just started the game, the songs are initialized
-        const trackingUsers = this.discordBot.catchTheSummerHit.songsCatchers.get(this.discordBot.catchTheSummerHit.trackOfTheDay.track_title);
-        if (!trackingUsers.getUsers().includes(user.username)) {
-            await this.discordBot.catchTheSummerHit.initContestantTracks(user.username);
+        if (this.discordBot.catchTheSummerHit.trackOfTheDay) {
+            const trackingUsers = this.discordBot.catchTheSummerHit.songsCatchers.get(this.discordBot.catchTheSummerHit.trackOfTheDay.track_title);
+            if (!trackingUsers.getUsers().includes(user.username)) {
+                await this.discordBot.catchTheSummerHit.initContestantTracks(user.username);
+            }
         }
 
         const userLeaderboard = await this.discordBot.catchTheSummerHit.getHighscoresForUser(user.username, 2);
@@ -203,26 +205,27 @@ class CommandHandler {
     }
 
     getTrackOfTheDayEmbed(trackOfTheDay) {
-        return new EmbedBuilder()
+        const embed = new EmbedBuilder()
             .setTitle("🎺 Track of the Day")
             .addFields({
                 name: 'Title',
-                value: trackOfTheDay.track_title,
+                value: trackOfTheDay?.track_title ?? 'No track of the day yet',
                 inline: true
             }, {
                 name: 'Artist',
-                value: trackOfTheDay.artist_name,
+                value: trackOfTheDay?.artist_name ?? 'Not available',
                 inline: true
             }, {
                 name: 'Points',
-                value: `+ ${trackOfTheDay.points} points`,
+                value: `+ ${trackOfTheDay?.points ?? 0} points`,
             })
-            .setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480${trackOfTheDay.track_thumbnail}`)
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             });
+        if (trackOfTheDay?.track_thumbnail) embed.setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480${trackOfTheDay.track_thumbnail}`)
+        return embed;
     }
 
     #getPersonalTracksList(contestantInfo) {
