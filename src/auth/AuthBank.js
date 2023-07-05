@@ -152,7 +152,7 @@ class AuthBank {
         if (save) await this.saveUsers();
 
         const currentTime = Math.floor(Date.now() / 1000);
-        const timeToRefresh = Math.max(0, user.expires - currentTime - 600);
+        const timeToRefresh = Math.max(5, user.expires - currentTime - 3600);
         console.log(`Next refresh for ${username} in ${timeToRefresh} seconds`);
         setTimeout(async () => {
             await this.refreshUserToken(username, true, true);
