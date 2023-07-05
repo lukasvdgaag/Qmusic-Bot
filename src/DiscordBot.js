@@ -5,6 +5,7 @@ const {
 const CommandHandler = require("./CommandHandler");
 const CatchTheSummerHit = require("./games/CatchTheSummerHit");
 const SocketListener = require("./SocketListener");
+const CatchTheArtist = require("./games/CatchTheArtist");
 
 class DiscordBot {
 
@@ -26,9 +27,10 @@ class DiscordBot {
 
     #initListeners() {
         this.client.on('ready', () => {
-            this.#initCommands()
+            this.#initCommands();
 
             this.catchTheSummerHit = new CatchTheSummerHit(this);
+            this.catchTheArtist = new CatchTheArtist(this);
             this.commandHandler = new CommandHandler(this);
             this.socket = new SocketListener(this);
 
@@ -230,6 +232,12 @@ class DiscordBot {
         const channel = this.client.channels.cache.get(channelId) ?? await this.client.channels.fetch(channelId);
 
         return await channel.send(message);
+    }
+
+    isNightTime() {
+        const now = new Date();
+        const hour = now.getHours();
+        return hour >= 3 && hour < 6;
     }
 
 }

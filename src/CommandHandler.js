@@ -226,6 +226,8 @@ class CommandHandler {
         // save if one of the settings changed
         if (enable != null || notify != null || catchAtNight != null) {
             await this.discordBot.authBank.saveUsers();
+
+            await this.discordBot.catchTheSummerHit.initContestantTracks(user.username);
         }
 
         const embed = new EmbedBuilder()
@@ -263,13 +265,15 @@ class CommandHandler {
 
         if (enable != null) settings.enabled = enable;
         if (notify != null) settings.notify = notify;
-        if (artist != null) settings.artist = artist.toUpperCase();
+        if (artist != null) settings.artist_name = artist.toUpperCase();
         if (sendAppMessage != null) settings.send_app_message = sendAppMessage;
         if (notifyWhenUpcoming != null) settings.notify_when_upcoming = notifyWhenUpcoming;
 
         // save if one of the settings changed
         if (enable != null || notify != null || artist != null || sendAppMessage != null || notifyWhenUpcoming != null) {
             await this.discordBot.authBank.saveUsers();
+
+            this.discordBot.catchTheArtist.initContestant(user);
         }
 
         const embed = new EmbedBuilder()
@@ -277,7 +281,7 @@ class CommandHandler {
             .setDescription(`Your Catch The Artist settings have been updated.`)
             .addFields(
                 {name: 'Enabled', value: settings.enabled ? '✅ Enabled' : '❌ Disabled', inline: true},
-                {name: 'Artist', value: settings?.artist ?? 'Not set', inline: true},
+                {name: 'Artist', value: settings?.artist_name ?? 'Not set', inline: true},
                 {name: 'Notify', value: settings.notify ? '✅ You will receive pings when it\'s time!' : '❌ You will __not__ receive pings when it\'s time', inline: true},
                 {name: 'Notify when upcoming', value: settings.notify_when_upcoming ? '✅ You will receive pings when the artist is will be playing next!' : '❌ You will __not__ receive pings when the artist will be playing next!', inline: true},
                 {name: 'Send app message', value: settings.send_app_message ? '✅ The bot will automatically send the message for you in the Qmusic app when the song is playing!' : '❌ The bot will __not__ automatically send the message for you in the Qmusic app! You will have to do this yourself.', inline: true},

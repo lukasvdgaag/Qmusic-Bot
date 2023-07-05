@@ -110,6 +110,9 @@ class CatchTheSummerHit {
 
         const tracks = contestantInfo.tracks;
 
+        // removing the user from all the songs
+        this.removeUser(username);
+
         // Add the user to the global song
         if (this.trackOfTheDay) {
             let globalHit = this.songsCatchers.get(this.trackOfTheDay.track_title);
@@ -191,7 +194,7 @@ class CatchTheSummerHit {
         const songUsers = songInfo.getUsers();
         const promises = []
 
-        const isNight = this.#isNightTime();
+        const isNight = this.#discordBot.isNightTime();
 
         // catch the song for every user in the songUsers list
         // but randomly over a course of 5 - 15 seconds after the song has been played
@@ -300,12 +303,6 @@ class CatchTheSummerHit {
         }
 
         return catchedUsers;
-    }
-
-    #isNightTime() {
-        const now = new Date();
-        const hour = now.getHours();
-        return hour >= 3 && hour < 6;
     }
 
 }
