@@ -204,6 +204,93 @@ class CommandHandler {
         await this.#sendAccountRemovedMessage(interaction, user.username);
     }
 
+    async handleSummerHitSettingsCommand(interaction) {
+        const userId = interaction.user.id;
+
+        const user = this.discordBot.authBank.getUserByDiscordId(userId);
+        if (user == null) {
+            await this.#sendUnauthorizedMessage(interaction);
+            return;
+        }
+
+        const enable = interaction.options.getBoolean('enable');
+        const notify = interaction.options.getBoolean('notify');
+        const catchAtNight = interaction.options.getBoolean('catch_at_night');
+
+        const settings = user.settings.catch_the_summer_hit;
+
+        if (enable != null) settings.enabled = enable;
+        if (notify != null) settings.notify = notify;
+        if (catchAtNight != null) settings.catch_at_night = catchAtNight;
+
+        // save if one of the settings changed
+        if (enable != null || notify != null || catchAtNight != null) {
+            await this.discordBot.authBank.saveUsers();
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("⚙️ Catch The Summer Hit Settings")
+            .setDescription('Your Catch The Summer Hit settings.')
+            .addFields(
+                {name: 'Enabled', value: settings.enabled ? '✅ Enabled' : '❌ Disabled', inline: true},
+                {name: 'Notify', value: settings.notify ? '✅ You will be notified when we caught one of your songs!' : '❌ You will __not__ be notified when we catch one of your songs.', inline: true},
+                {name: 'Catch At Night', value: settings.catch_at_night ? '✅ We will catch songs at night (between 2 and 6)!' : '❌ We will __not__ catch songs at night (between 2 and 6).', inline: true},
+            ).setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            })
+
+        await interaction.reply({embeds: [embed]});
+    }
+
+    async handleCatchArtistSettingsCommand(interaction) {
+        const userId = interaction.user.id;
+
+        const user = this.discordBot.authBank.getUserByDiscordId(userId);
+        if (user == null) {
+            await this.#sendUnauthorizedMessage(interaction);
+            return;
+        }
+
+        const enable = interaction.options.getBoolean('enable');
+        const notify = interaction.options.getBoolean('notify');
+        const artist = interaction.options.getString('artist');
+        const sendAppMessage = interaction.options.getBoolean('send_app_message');
+        const notifyWhenUpcoming = interaction.options.getBoolean('notify_when_upcoming');
+
+        const settings = user.settings.catch_the_artist;
+
+        if (enable != null) settings.enabled = enable;
+        if (notify != null) settings.notify = notify;
+        if (artist != null) settings.artist = artist.toUpperCase();
+        if (sendAppMessage != null) settings.send_app_message = sendAppMessage;
+        if (notifyWhenUpcoming != null) settings.notify_when_upcoming = notifyWhenUpcoming;
+
+        // save if one of the settings changed
+        if (enable != null || notify != null || artist != null || sendAppMessage != null || notifyWhenUpcoming != null) {
+            await this.discordBot.authBank.saveUsers();
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("⚙️ Catch The Artist Settings")
+            .setDescription(`Your Catch The Artist settings have been updated.`)
+            .addFields(
+                {name: 'Enabled', value: settings.enabled ? '✅ Enabled' : '❌ Disabled', inline: true},
+                {name: 'Artist', value: settings?.artist ?? 'Not set', inline: true},
+                {name: 'Notify', value: settings.notify ? '✅ You will receive pings when it\'s time!' : '❌ You will __not__ receive pings when it\'s time', inline: true},
+                {name: 'Notify when upcoming', value: settings.notify_when_upcoming ? '✅ You will receive pings when the artist is will be playing next!' : '❌ You will __not__ receive pings when the artist will be playing next!', inline: true},
+                {name: 'Send app message', value: settings.send_app_message ? '✅ The bot will automatically send the message for you in the Qmusic app when the song is playing!' : '❌ The bot will __not__ automatically send the message for you in the Qmusic app! You will have to do this yourself.', inline: true},
+            )
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            })
+
+        await interaction.reply({embeds: [embed]});
+    }
+
     getTrackOfTheDayEmbed(trackOfTheDay) {
         const embed = new EmbedBuilder()
             .setTitle("🎺 Track of the Day")

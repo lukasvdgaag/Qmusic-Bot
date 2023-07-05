@@ -1,5 +1,6 @@
-const {Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction,
-    SlashCommandUserOption, MessagePayload
+const {
+    Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction,
+    SlashCommandUserOption, MessagePayload, SlashCommandBooleanOption
 } = require("discord.js");
 const CommandHandler = require("./CommandHandler");
 const CatchTheSummerHit = require("./games/CatchTheSummerHit");
@@ -46,6 +47,9 @@ class DiscordBot {
         /summerhit stats
         /summerhit leaderboard [count]
         /summerhit entercode <code>
+        /summerhit settings [enable] [notify] [catch_at_night]
+
+        /catchtheartist settings [enable] [notify] [artist] [send_app_message] [notify_when_upcoming]
 
         /qmusic addaccount <username> <password> [user]
         /qmusic removeaccount [username]
@@ -83,7 +87,24 @@ class DiscordBot {
                             .setName('code')
                             .setDescription('The secret code')
                             .setRequired(true)
-                    )),
+                    ))
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('settings')
+                    .setDescription('Change your Catch The Summer Hit settings')
+                    .addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('enable')
+                            .setDescription('Enable or disable the game')
+                    ).addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('notify')
+                            .setDescription('Whether you want to receive notifications for catches')
+                    ).addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('catch_at_night')
+                            .setDescription('Whether you want to songs to be caught at night')
+                    )
+                ),
             new SlashCommandBuilder()
                 .setName("qmusic")
                 .setDescription("General Qmusic commands")
@@ -105,13 +126,42 @@ class DiscordBot {
                         .setDescription('The user that this account belongs to')
                         .setRequired(false)
                     )
-                ).addSubcommand(new SlashCommandSubcommandBuilder()
+                )
+                .addSubcommand(new SlashCommandSubcommandBuilder()
                     .setName('removeaccount')
                     .setDescription('Remove your Qmusic account from your Discord account')
                     .addStringOption(new SlashCommandStringOption()
                         .setName('username')
                         .setDescription('The username of the account to remove the account from')
                         .setRequired(false)
+                    )
+                ),
+            new SlashCommandBuilder()
+                .setName("catchartist")
+                .setDescription("Qmusic's Catch The Artist game")
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('settings')
+                    .setDescription('Change your Catch The Artist settings')
+                    .addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('enable')
+                            .setDescription('Enable or disable the game')
+                    ).addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('notify')
+                            .setDescription('Whether you want to receive notifications for catches')
+                    ).addStringOption(
+                        new SlashCommandStringOption()
+                            .setName('artist')
+                            .setDescription('The artist you want to catch')
+                    ).addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('send_app_message')
+                            .setDescription('Whether you want the bot to automatically send a message to the Qmusic app')
+                    ).addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('notify_when_upcoming')
+                            .setDescription('Whether you want to receive a notification when the artist is coming up')
                     )
                 )
         ];
@@ -133,8 +183,7 @@ class DiscordBot {
                         break;
                 }
 
-            }
-            else if (interaction.commandName === 'summerhit') {
+            } else if (interaction.commandName === 'summerhit') {
                 const subCommand = interaction.options.getSubcommand(false);
 
                 switch (subCommand) {
@@ -153,6 +202,17 @@ class DiscordBot {
                     case 'entercode':
                         const code = interaction.options.getString('code');
                         await interaction.reply({content: 'This command is not yet implemented', ephemeral: true});
+                        break;
+                    case 'settings':
+                        await this.commandHandler.handleSummerHitSettingsCommand(interaction);
+                        break;
+                }
+            } else if (interaction.commandName === 'catchartist') {
+                const subCommand = interaction.options.getSubcommand(false);
+
+                switch (subCommand) {
+                    case 'settings':
+                        await this.commandHandler.handleCatchArtistSettingsCommand(interaction);
                         break;
                 }
             }

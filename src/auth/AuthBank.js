@@ -82,6 +82,11 @@ class AuthBank {
         return this.users.values();
     }
 
+    /**
+     * Get a user by their discord ID
+     * @param {string} discordId
+     * @returns {Account|null}
+     */
     getUserByDiscordId(discordId) {
         for (const user of this.users.values()) {
             if (user.discord_id === discordId) return user;
