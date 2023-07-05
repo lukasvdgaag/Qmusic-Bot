@@ -1,5 +1,5 @@
 # Qmusic Bot
-![qmusic banner](/assets/qmusic-banner.jpg)
+![Qmusic banner](/docs/assets/qmusic-banner.jpg)
 
 ## About
 
@@ -63,7 +63,7 @@ Below is a list of all the API endpoints that are used by the bot.
 
 | Endpoint                             | Method | Description                                                                                                                              | Body                         |
 |--------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
-| **Messages**                         |        |                                                                                                                                          | -                            |
+| **QMessagesManager**                         |        |                                                                                                                                          | -                            |
 | `/2.0/messages`                      | GET    | Get the latest messages sent by the user. Add the `?limit=50` param to change the number of messages to retrieve. _Requires auth._       | -                            |
 | `/2.0/messages`                      | POST   | Send a message to the Qmusic studio. _Requires auth._                                                                                    | `{"text": "<your message>"}` |
 |                                      |        |                                                                                                                                          | -                            |
