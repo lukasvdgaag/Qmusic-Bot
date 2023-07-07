@@ -103,7 +103,7 @@ class CommandHandler {
                 inline: true
             }, {
                 name: 'Your Tracks',
-                value: this.#getPersonalTracksList(contestantInfo),
+                value: this.#getPersonalTracksList(user.username, contestantInfo),
                 inline: false
             })
             .setColor(process.env.MAIN_COLOR)
@@ -319,17 +319,21 @@ class CommandHandler {
         return embed;
     }
 
-    #getPersonalTracksList(contestantInfo) {
-        const tracks = contestantInfo.tracks;
+    #getPersonalTracksList(username, contestantInfo) {
+        // const tracks = contestantInfo.tracks;
+        const tracks = Array.from(this.discordBot.catchTheSummerHit.songsCatchers.values())
+            .filter(c => c.hasUser(username));
         let message = '';
 
-        for (let i = 0; i < tracks.length; i++) {
+        let i;
+        for (i = 0; i < tracks.length; i++) {
             const track = tracks[i];
 
             message += `${i + 1}. **${track.track_title} - ${track.artist_name}** (+${track.points} points)`;
 
             if (i < tracks.length - 1) message += '\n';
         }
+
         return message;
     }
 

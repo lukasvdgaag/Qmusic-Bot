@@ -43,18 +43,7 @@ class CatchTheSummerHit {
 
         if (trackOfTheDayWasNull || isNextDay) {
             await this.loadTrackOfTheDay();
-            if (isNextDay) await this.initContestantsTracks();
-
-            // check if the track of the day was null and is now not null
-            if (!isNextDay && trackOfTheDayWasNull && this.trackOfTheDay != null) {
-                this.songsCatchers.set(this.trackOfTheDay.track_title, new SummerHitInfo(this.trackOfTheDay));
-                // add all users to the track of the day
-                for (const user of this.#discordBot.authBank.getUsers()) {
-                    if (user.settings.catch_the_summer_hit.enabled) {
-                        this.songsCatchers.get(this.trackOfTheDay.track_title).addUser(user.username);
-                    }
-                }
-            }
+            await this.initContestantsTracks();
         }
     }
 
