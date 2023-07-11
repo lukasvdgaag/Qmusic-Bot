@@ -33,18 +33,22 @@ class CatchTheSummerHit {
     }
 
     async checkForNewDay() {
-        const today = new Date();
-        const oldDate = new Date(this.trackOfTheDayLastUpdated ?? 0);
-
         const trackOfTheDayWasNull = this.trackOfTheDay == null;
-        const isNextDay = today.getUTCFullYear() > oldDate.getUTCFullYear() ||
-            today.getUTCMonth() > oldDate.getUTCMonth() ||
-            today.getUTCDate() > oldDate.getUTCDate();
+        const isNextDay = this.#isNextDay(this.trackOfTheDay ? new Date(this.trackOfTheDay?.date) : null);
 
         if (trackOfTheDayWasNull || isNextDay) {
             await this.loadTrackOfTheDay();
             await this.initContestantsTracks();
         }
+    }
+
+    #isNextDay(date) {
+        if (!date) return true;
+        const today = new Date();
+
+        return today.getUTCFullYear() > date.getUTCFullYear() ||
+        today.getUTCMonth() > date.getUTCMonth() ||
+        today.getUTCDate() > date.getUTCDate();
     }
 
     removeUser(username) {
@@ -65,6 +69,7 @@ class CatchTheSummerHit {
 
             this.trackOfTheDay = response.data.track_of_the_day;
             this.trackOfTheDayLastUpdated = Date.now();
+            if (this.trackOfTheDay) this.trackOfTheDay.date = Date.now();
 
             let embed = this.#discordBot.commandHandler.getTrackOfTheDayEmbed(this.trackOfTheDay);
             await this.#discordBot.sendMessage({embeds: [embed]})
@@ -176,7 +181,7 @@ class CatchTheSummerHit {
 
         // Check if the artist AND the song title match
         let songInfo = this.songsCatchers.get(songTitle);
-        if (songInfo.artist_name !== artistName) {
+        if (!songInfo.artist_name.includes(artistName) && !artistName.includes(songInfo.artist_name)) {
             return [];
         }
 

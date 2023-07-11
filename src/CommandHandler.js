@@ -175,6 +175,8 @@ class CommandHandler {
             return;
         }
 
+        await this.discordBot.catchTheSummerHit.initContestantTracks(username);
+
         await this.#sendAccountLinkedMessage(interaction, username, userId);
     }
 
@@ -198,8 +200,8 @@ class CommandHandler {
             }
         }
 
-        await this.discordBot.authBank.removeUser(user.username);
         this.discordBot.catchTheSummerHit.removeUser(user.username);
+        await this.discordBot.authBank.removeUser(user.username);
 
         await this.#sendAccountRemovedMessage(interaction, user.username);
     }
