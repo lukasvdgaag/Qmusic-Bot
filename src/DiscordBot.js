@@ -6,6 +6,7 @@ const CommandHandler = require("./CommandHandler");
 const CatchTheSummerHit = require("./games/CatchTheSummerHit");
 const SocketListener = require("./SocketListener");
 const CatchTheArtist = require("./games/CatchTheArtist");
+const RadioListener = require("./radio/RadioListener");
 
 class DiscordBot {
 
@@ -17,16 +18,20 @@ class DiscordBot {
                 GatewayIntentBits.GuildMessageReactions,
                 GatewayIntentBits.GuildMembers,
                 GatewayIntentBits.MessageContent,
+                GatewayIntentBits.GuildVoiceStates,
             ]
         });
         this.authBank = authBank;
+
+        this.radioListener = new RadioListener();
 
         this.#initListeners();
         this.client.login(process.env.DISCORD_TOKEN)
     }
 
     #initListeners() {
-        this.client.on('ready', () => {
+        this.client.on('ready', async () => {
+            await this.radioListener.loadStations();
             this.#initCommands();
 
             this.catchTheSummerHit = new CatchTheSummerHit(this);
@@ -39,7 +44,29 @@ class DiscordBot {
 
         this.client.on('interactionCreate', async interaction => {
             await this.#handleInteraction(interaction);
-        })
+        });
+
+        this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            const botId = this.client.user.id;
+            if (newState.member.id !== botId) return;
+
+            const oldChannel = oldState.channel;
+            const newChannel = newState.channel;
+
+            // bot got disconnected / kicked
+            if (oldChannel && !newChannel && this.radioListener.activeChannel) {
+                this.radioListener.stop();
+                await this.sendMessage("I got kicked from the channel. Stopping the radio.");
+                return;
+            }
+
+            // bot got moved to another channel
+            if (this.radioListener.activeChannel && oldChannel && newChannel && oldChannel.id !== newChannel.id) {
+                this.radioListener.activeChannel = newChannel.id;
+                await this.sendMessage(`I got moved to <#${newChannel.id}>.`);
+            }
+
+        });
     }
 
     #initCommands() {
@@ -55,6 +82,7 @@ class DiscordBot {
 
         /qmusic addaccount <username> <password> [user]
         /qmusic removeaccount [username]
+        /qmusic listen [station]
          */
         const commands = [
             new SlashCommandBuilder()
@@ -137,6 +165,20 @@ class DiscordBot {
                         .setDescription('The username of the account to remove the account from')
                         .setRequired(false)
                     )
+                )
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('listen')
+                    .setDescription('Listen to Qmusic in your voice channel')
+                    .addStringOption(new SlashCommandStringOption()
+                        .setName('station')
+                        .setDescription('The station to listen to')
+                        .setRequired(false)
+                        .setChoices(...this.radioListener.getCommandOptions())
+                    )
+                )
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('stop')
+                    .setDescription('Stop listening to Qmusic')
                 ),
             new SlashCommandBuilder()
                 .setName("catchartist")
@@ -182,6 +224,12 @@ class DiscordBot {
                         break;
                     case 'removeaccount':
                         await this.commandHandler.handleQmusicRemoveAccountCommand(interaction);
+                        break;
+                    case 'listen':
+                        await this.commandHandler.handleQmusicListenCommand(interaction);
+                        break;
+                    case 'stop':
+                        await this.commandHandler.handleQmusicStopCommand(interaction);
                         break;
                 }
 

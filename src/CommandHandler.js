@@ -1,4 +1,5 @@
 const {EmbedBuilder} = require("discord.js");
+const {joinVoiceChannel, createAudioPlayer} = require("@discordjs/voice");
 
 class CommandHandler {
 
@@ -237,8 +238,16 @@ class CommandHandler {
             .setDescription('Your Catch The Summer Hit settings.')
             .addFields(
                 {name: 'Enabled', value: settings.enabled ? '✅ Enabled' : '❌ Disabled', inline: true},
-                {name: 'Notify', value: settings.notify ? '✅ You will be notified when we caught one of your songs!' : '❌ You will __not__ be notified when we catch one of your songs.', inline: true},
-                {name: 'Catch At Night', value: settings.catch_at_night ? '✅ We will catch songs at night (between 2 and 6)!' : '❌ We will __not__ catch songs at night (between 2 and 6).', inline: true},
+                {
+                    name: 'Notify',
+                    value: settings.notify ? '✅ You will be notified when we caught one of your songs!' : '❌ You will __not__ be notified when we catch one of your songs.',
+                    inline: true
+                },
+                {
+                    name: 'Catch At Night',
+                    value: settings.catch_at_night ? '✅ We will catch songs at night (between 2 and 6)!' : '❌ We will __not__ catch songs at night (between 2 and 6).',
+                    inline: true
+                },
             ).setColor(process.env.MAIN_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
@@ -246,6 +255,41 @@ class CommandHandler {
             })
 
         await interaction.reply({embeds: [embed]});
+    }
+
+    async handleQmusicListenCommand(interaction) {
+        // check if user is in a voice channel
+        const voiceChannel = interaction.member.voice.channel;
+
+        if (!voiceChannel) {
+            await this.#sendNotInVoiceChannelMessage(interaction);
+            return;
+        }
+
+        const station = interaction.options.getString('station') ?? 'qmusic_nl';
+        if (!this.discordBot.radioListener.stations.has(station)) {
+            await this.#sendInvalidStationMessage(interaction);
+            return;
+        }
+
+        if (this.discordBot.radioListener.player) {
+            this.discordBot.radioListener.stop();
+        }
+
+        await this.discordBot.radioListener.playStation(station, voiceChannel);
+
+        await this.#sendListeningMessage(interaction, station);
+    }
+
+    async handleQmusicStopCommand(interaction) {
+        if (!this.discordBot.radioListener.player) {
+            await this.#sendNotListeningMessage(interaction);
+            return;
+        }
+
+        this.discordBot.radioListener.stop();
+
+        await this.#sendStoppedListeningMessage(interaction);
     }
 
     async handleCatchArtistSettingsCommand(interaction) {
@@ -284,9 +328,21 @@ class CommandHandler {
             .addFields(
                 {name: 'Enabled', value: settings.enabled ? '✅ Enabled' : '❌ Disabled', inline: true},
                 {name: 'Artist', value: settings?.artist_name ?? 'Not set', inline: true},
-                {name: 'Notify', value: settings.notify ? '✅ You will receive pings when it\'s time!' : '❌ You will __not__ receive pings when it\'s time', inline: true},
-                {name: 'Notify when upcoming', value: settings.notify_when_upcoming ? '✅ You will receive pings when the artist is will be playing next!' : '❌ You will __not__ receive pings when the artist will be playing next!', inline: true},
-                {name: 'Send app message', value: settings.send_app_message ? '✅ The bot will automatically send the message for you in the Qmusic app when the song is playing!' : '❌ The bot will __not__ automatically send the message for you in the Qmusic app! You will have to do this yourself.', inline: true},
+                {
+                    name: 'Notify',
+                    value: settings.notify ? '✅ You will receive pings when it\'s time!' : '❌ You will __not__ receive pings when it\'s time',
+                    inline: true
+                },
+                {
+                    name: 'Notify when upcoming',
+                    value: settings.notify_when_upcoming ? '✅ You will receive pings when the artist is will be playing next!' : '❌ You will __not__ receive pings when the artist will be playing next!',
+                    inline: true
+                },
+                {
+                    name: 'Send app message',
+                    value: settings.send_app_message ? '✅ The bot will automatically send the message for you in the Qmusic app when the song is playing!' : '❌ The bot will __not__ automatically send the message for you in the Qmusic app! You will have to do this yourself.',
+                    inline: true
+                },
             )
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
@@ -381,6 +437,83 @@ class CommandHandler {
         }
 
         return result;
+    }
+
+    async #sendNotListeningMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("❌ Not listening")
+            .setDescription("You are not listening to a radio station. Please use the `/qmusic listen` command to start listening to a radio station.")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+        await interaction.reply({embeds: [embed]});
+    }
+
+    async #sendStoppedListeningMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("📻 Stopped listening")
+            .setDescription("You are no longer listening to the radio.")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+        await interaction.reply({embeds: [embed]});
+    }
+
+    async #sendListeningMessage(interaction, stationId) {
+        const station = this.discordBot.radioListener.stations.get(stationId);
+
+        const embed = new EmbedBuilder()
+            .setTitle("📻 Listening to " + station.name)
+            .setDescription("You are now listening to " + station.name + ".")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+        await interaction.reply({embeds: [embed]});
+    }
+
+    /*async #sendAlreadyListeningMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("❌ Already listening")
+            .setDescription("You are already listening to a radio station. Please use the `/qmusic stop` command to stop listening to the radio before you can listen to another station.")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }*/
+
+    async #sendInvalidStationMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("❌ Invalid station")
+            .setDescription("This is not a valid station. Please use one of the following stations: " + Array.from(this.discordBot.radioListener.stations.keys()).join(', '))
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }
+
+    async #sendNotInVoiceChannelMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("❌ Not in a voice channel")
+            .setDescription("You need to be in a voice channel to use this command.")
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        await interaction.reply({embeds: [embed], ephemeral: true});
     }
 
     async #sendGameUnavailableMessage(interaction) {

@@ -1,4 +1,5 @@
 # Qmusic Bot
+
 ![Qmusic banner](/docs/assets/qmusic-banner.jpg)
 
 ## About
@@ -26,10 +27,12 @@ Before you can run the bot, you need to configure it.
 2. Fill in the required values such as your Discord webhook URL. You can find your Discord webhook URL by going to your
    Discord server settings, clicking on "Integrations", and then clicking on "Webhooks".
 3. Create a `tokens.json` file in the root directory and enter your account details in the following format. Make sure to replace the values with your own
-   account details. It is possible to add multiple accounts to the bot by adding more objects to the JSON file. Make sure to identify each account by its email address.
+   account details. It is possible to add multiple accounts to the bot by adding more objects to the JSON file. Make sure to identify each account by its email
+   address.
    The Discord ID is optional, but needed if you want to receive @pings in the Discord server when the bot does something related to you.
 
 ### tokens.json file example
+
 ```json
 {
     "your.email@example.com": {
@@ -63,11 +66,14 @@ Below is a list of all the API endpoints that are used by the bot.
 
 | Endpoint                             | Method | Description                                                                                                                              | Body                         |
 |--------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
-| **QMessagesManager**                         |        |                                                                                                                                          | -                            |
+| **General**                          |        |                                                                                                                                          |                              |
+| `/2.0/channels`                      | GET    | Get a list of all Qmusic radio channels and their stream URLs.                                                                           | -                            |
+|                                      |        |                                                                                                                                          | -                            |
+| **QMessagesManager**                 |        |                                                                                                                                          |                              |
 | `/2.0/messages`                      | GET    | Get the latest messages sent by the user. Add the `?limit=50` param to change the number of messages to retrieve. _Requires auth._       | -                            |
 | `/2.0/messages`                      | POST   | Send a message to the Qmusic studio. _Requires auth._                                                                                    | `{"text": "<your message>"}` |
 |                                      |        |                                                                                                                                          | -                            |
-| **Catch The Summerhit**              |        |                                                                                                                                          | -                            |
+| **Catch The Summerhit**              |        |                                                                                                                                          |                              |
 | `/2.4/cth/games/17/`                 | GET    | Get the game information, such as start, end, and score reset dates.                                                                     | -                            |
 | `/2.4/cth/games/17/track_of_the_day` | GET    | Get the current track of the day.                                                                                                        | -                            |
 | `/2.4/cth/games/17/contestant`       | GET    | Get the additional tracks of the week for the contestant. _Requires auth._                                                               | -                            |
