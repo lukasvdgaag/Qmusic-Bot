@@ -46,9 +46,9 @@ class CatchTheSummerHit {
         if (!date) return true;
         const today = new Date();
 
-        return today.getUTCFullYear() > date.getUTCFullYear() ||
-        today.getUTCMonth() > date.getUTCMonth() ||
-        today.getUTCDate() > date.getUTCDate();
+        return today.getUTCFullYear() !== date.getUTCFullYear() ||
+        today.getUTCMonth() !== date.getUTCMonth() ||
+        today.getUTCDate() !== date.getUTCDate();
     }
 
     removeUser(username) {
@@ -80,7 +80,7 @@ class CatchTheSummerHit {
     }
 
     async initContestantsTracks() {
-        let trackOfTheDayTitle = this.trackOfTheDay?.track_title;
+        let trackOfTheDayTitle = this.trackOfTheDay?.track_title.toUpperCase();
         const users = this.#discordBot.authBank.getUsers();
 
         // Preparing the song catchers map
@@ -109,16 +109,16 @@ class CatchTheSummerHit {
 
         // Add the user to the global song
         if (this.trackOfTheDay) {
-            let globalHit = this.songsCatchers.get(this.trackOfTheDay.track_title);
+            let globalHit = this.songsCatchers.get(this.trackOfTheDay.track_title.toUpperCase());
             globalHit?.addUser(username);
         }
 
         // Adding all the users' personal songs to the catchers map
         for (const track of tracks) {
-            if (!this.songsCatchers.has(track.track_title)) {
-                this.songsCatchers.set(track.track_title, new SummerHitInfo(track));
+            if (!this.songsCatchers.has(track.track_title.toUpperCase())) {
+                this.songsCatchers.set(track.track_title.toUpperCase(), new SummerHitInfo(track));
             }
-            this.songsCatchers.get(track.track_title).addUser(username);
+            this.songsCatchers.get(track.track_title.toUpperCase()).addUser(username);
         }
     }
 
@@ -175,15 +175,15 @@ class CatchTheSummerHit {
     }
 
     async checkForCatches(songTitle, artistName) {
-        if (!this.songsCatchers.has(songTitle)) {
+        if (!this.songsCatchers.has(songTitle.toUpperCase())) {
             return [];
         }
 
         // Check if the artist AND the song title match
-        let songInfo = this.songsCatchers.get(songTitle);
-        if (!songInfo.artist_name.includes(artistName) && !artistName.includes(songInfo.artist_name)) {
-            return [];
-        }
+        let songInfo = this.songsCatchers.get(songTitle.toUpperCase());
+        // if (!songInfo.artist_name.includes(artistName) && !artistName.includes(songInfo.artist_name)) {
+        //     return [];
+        // }
 
         const songUsers = songInfo.getUsers();
         const promises = []
@@ -266,12 +266,12 @@ class CatchTheSummerHit {
     }
 
     async catchSong(songTitle, artistName) {
-        if (!this.songsCatchers.has(songTitle)) {
+        if (!this.songsCatchers.has(songTitle.toUpperCase())) {
             return [];
         }
 
         const promises = [];
-        let songInfo = this.songsCatchers.get(songTitle);
+        let songInfo = this.songsCatchers.get(songTitle.toUpperCase());
 
         if (songInfo.artist_name !== artistName) {
             return [];

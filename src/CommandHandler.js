@@ -75,7 +75,7 @@ class CommandHandler {
 
         // Checking that if the user just started the game, the songs are initialized
         if (this.discordBot.catchTheSummerHit.trackOfTheDay) {
-            const trackingUsers = this.discordBot.catchTheSummerHit.songsCatchers.get(this.discordBot.catchTheSummerHit.trackOfTheDay.track_title);
+            const trackingUsers = this.discordBot.catchTheSummerHit.songsCatchers.get(this.discordBot.catchTheSummerHit.trackOfTheDay.track_title.toUpperCase());
             if (!trackingUsers.getUsers().includes(user.username)) {
                 await this.discordBot.catchTheSummerHit.initContestantTracks(user.username);
             }
