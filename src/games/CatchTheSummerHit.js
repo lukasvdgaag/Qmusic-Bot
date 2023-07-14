@@ -210,7 +210,7 @@ class CatchTheSummerHit {
         const results = await Promise.allSettled(promises);
 
         // check if all the axios requests have an OK status
-        let catchedUsers = [];
+        let caughtUsers = [];
         for (let i = 0; i < results.length; i++) {
             const result = results[i];
             if (result.status !== 'fulfilled') {
@@ -218,14 +218,11 @@ class CatchTheSummerHit {
             }
 
             if (result.value.status === 200 || result.value.status === 201) {
-                const user = this.#discordBot.authBank.getUser(songUsers[i]);
-                if (user.settings.catch_the_summer_hit.notify) {
-                    catchedUsers.push(songUsers[i]);
-                }
+                caughtUsers.push(songUsers[i]);
             }
         }
 
-        await this.sendCatchResults(songInfo, catchedUsers);
+        await this.sendCatchResults(songInfo, caughtUsers);
     }
 
     /**
@@ -240,8 +237,12 @@ class CatchTheSummerHit {
 
         const mentionUsers = new Set();
         for (const username of users) {
-            const discord = this.#discordBot.authBank.getUser(username)?.discord_id;
-            if (discord) mentionUsers.add(`<@${discord}>`);
+            let user = this.#discordBot.authBank.getUser(username);
+
+            if (user && user.settings.catch_the_summer_hit.notify) {
+                const discord = user?.discord_id;
+                if (discord) mentionUsers.add(`<@${discord}>`);
+            }
         }
 
         const embed = new EmbedBuilder()
@@ -259,7 +260,7 @@ class CatchTheSummerHit {
             })
 
         await this.#discordBot.sendMessage({
-            content: `I caught a summer hit for ${Array.from(mentionUsers).join(' ')}`,
+            content: mentionUsers.size === 0 ? 'I caught a summer hit!' : `I caught a summer hit for ${Array.from(mentionUsers).join(' ')}`,
             embeds: [embed]
         })
 
