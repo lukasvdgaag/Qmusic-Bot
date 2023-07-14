@@ -100,6 +100,11 @@ class DiscordBot {
                 .addSubcommand(new SlashCommandSubcommandBuilder()
                     .setName('leaderboard')
                     .setDescription('Get the leaderboard')
+                    .addBooleanOption(new SlashCommandBooleanOption()
+                        .setName('internal')
+                        .setDescription('Whether to only show bot users')
+                        .setRequired(false)
+                    )
                     .addIntegerOption(
                         new SlashCommandIntegerOption()
                             .setName('count')

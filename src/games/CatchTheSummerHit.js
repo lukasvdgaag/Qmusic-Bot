@@ -154,12 +154,12 @@ class CatchTheSummerHit {
         }
     }
 
-    async getHighscoresForUser(username, limit = 10) {
+    async getHighscoresForUser(username, limit = 10, returnRaw = false) {
         const user = this.#discordBot.authBank.getUser(username);
         if (!user) return;
 
         try {
-            const {data} = await axios.get(`https://api.qmusic.nl/2.4/cth/games/17/highscores`, {
+            const response = axios.get(`https://api.qmusic.nl/2.4/cth/games/17/highscores`, {
                 params: {
                     limit
                 },
@@ -167,7 +167,9 @@ class CatchTheSummerHit {
                     'Authorization': `Bearer ${user.token}`
                 }
             });
+            if (returnRaw) return response;
 
+            const {data} = await response;
             return data.highscores;
         } catch (e) {
             return undefined;

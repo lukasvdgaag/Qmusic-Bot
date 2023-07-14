@@ -115,6 +115,12 @@ class CommandHandler {
     async handleSummerHitLeaderboardCommand(interaction) {
         const userId = interaction.user.id;
 
+        const internal = interaction.options.getBoolean('internal') || false;
+        if (internal) {
+            await this.handleSummerHitLeaderboardInternalCommand(interaction);
+            return;
+        }
+
         const user = this.discordBot.authBank.getUserByDiscordId(userId);
         if (user == null) {
             await this.#sendUnauthorizedMessage(interaction);
@@ -149,6 +155,75 @@ class CommandHandler {
                 inline: false
             })
             .setColor(process.env.MAIN_COLOR)
+
+        await interaction.reply({embeds: [embed]});
+    }
+
+    async handleSummerHitLeaderboardInternalCommand(interaction) {
+        const users = Array.from(this.discordBot.authBank.getUsers());
+
+        const promises = [];
+        for (const user of users) {
+            promises.push(this.discordBot.catchTheSummerHit.getHighscoresForUser(user.username, 0, true));
+        }
+
+        let rankArray = [];
+
+        const contestantInfos = await Promise.allSettled(promises);
+        for (let i = 0; i < contestantInfos.length; i++) {
+            const result = contestantInfos[i];
+            if (result.status !== 'fulfilled') {
+                console.log(result)
+                console.log(`Failed to fetch highscores for user ${users[i].username}`)
+                continue;
+            }
+
+            if (result.value.status === 200) {
+                const user = users[i];
+                const data = result.value.data.highscores.me;
+                const score = data.score;
+                const rank = data.rank;
+
+                rankArray.push({
+                    rank: rank,
+                    score: score,
+                    discordId: user.discord_id,
+                    username: user.username,
+                    emojiNumbers: this.#numberToEmojis(rank),
+                });
+            } else {
+                console.log('Invalid status code:', result.value.status);
+            }
+        }
+
+        if (rankArray.length === 0) {
+            await interaction.reply({content: "No internal stats could be fetched."});
+            return;
+        }
+
+        rankArray.sort((a, b) => a.rank - b.rank);
+
+        // add a ⬛ to the front of the rank to make it the same length as the longest rank
+        const longestRank = rankArray[rankArray.length - 1].emojiNumbers.length / 3;
+        for (let i = 0; i < rankArray.length; i++) {
+            const rank = rankArray[i];
+            const rankLength = rank.emojiNumbers.length / 3;
+            const difference = longestRank - rankLength;
+            rankArray[i].emojiNumbers = '⬛'.repeat(difference) + rank.emojiNumbers;
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("🏝️ Catch The Summer Hit Leaderboard")
+            .setDescription(`Internal leaderboard for Catch The Summer Hit.`)
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            })
+            .addFields({
+                name: 'Leaderboard',
+                value: rankArray.map((value) => `${value.emojiNumbers} ${value.rank <= 5 ? '🏆' : ''} ${value.discordId ? `<@${value.discordId}> - ` : ''} **${value.username}** (${value.score} points)`).join('\n'),
+            });
 
         await interaction.reply({embeds: [embed]});
     }
