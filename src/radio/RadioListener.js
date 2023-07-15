@@ -57,32 +57,41 @@ class RadioListener {
     async playStation(stationId, voiceChannel) {
         const station = this.stations.get(stationId);
 
-        const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: voiceChannel.guild.id,
-            adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-        });
-
-        const resource = createAudioResource(station.url, {
-            inlineVolume: true,
-        });
-
-        this.activeChannel = voiceChannel.id;
-
-        this.player = createAudioPlayer();
-        connection.subscribe(this.player);
-        this.player.play(resource);
-
-        this.player.on('error', error => {
-            console.error(`Error: ${error.message} with resource ${error.resource.metadata.title}`);
-            this.player.play(createAudioResource(station.url, {
+        if (this.player && this.player.state.status === AudioPlayerStatus.Playing) {
+            const resource = createAudioResource(station.url, {
                 inlineVolume: true,
-            }));
-        });
+            });
 
-        this.player.on(AudioPlayerStatus.Idle, () => {
-            connection.destroy();
-        })
+            this.player.stop();
+            this.player.play(resource);
+        } else {
+            const connection = joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: voiceChannel.guild.id,
+                adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+            });
+
+            const resource = createAudioResource(station.url, {
+                inlineVolume: true,
+            });
+
+            this.activeChannel = voiceChannel.id;
+
+            this.player = createAudioPlayer();
+            connection.subscribe(this.player);
+            this.player.play(resource);
+
+            this.player.on('error', error => {
+                console.error(`Error: ${error.message} with resource ${error.resource.metadata.title}`);
+                this.player.play(createAudioResource(station.url, {
+                    inlineVolume: true,
+                }));
+            });
+
+            this.player.on(AudioPlayerStatus.Idle, () => {
+                connection.destroy();
+            });
+        }
     }
 
     stop() {

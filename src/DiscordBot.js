@@ -48,10 +48,18 @@ class DiscordBot {
 
         this.client.on('voiceStateUpdate', async (oldState, newState) => {
             const botId = this.client.user.id;
-            if (newState.member.id !== botId) return;
 
             const oldChannel = oldState.channel;
             const newChannel = newState.channel;
+
+            // check if there is no one left in the voice channel
+            if (oldChannel && oldChannel.members.size === 1 && oldChannel.members.has(botId)) {
+                this.radioListener.stop();
+                await this.sendMessage("Leaving the voice channel because I'm alone :pensive:.");
+                return;
+            }
+
+            if (newState.member.id !== botId) return;
 
             // bot got disconnected / kicked
             if (oldChannel && !newChannel && this.radioListener.activeChannel) {
@@ -101,8 +109,8 @@ class DiscordBot {
                     .setName('leaderboard')
                     .setDescription('Get the leaderboard')
                     .addBooleanOption(new SlashCommandBooleanOption()
-                        .setName('internal')
-                        .setDescription('Whether to only show bot users')
+                        .setName('global')
+                        .setDescription('Whether to show the global leaderboard instead of bot users only')
                         .setRequired(false)
                     )
                     .addIntegerOption(

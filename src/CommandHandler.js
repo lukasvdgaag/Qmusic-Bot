@@ -115,8 +115,8 @@ class CommandHandler {
     async handleSummerHitLeaderboardCommand(interaction) {
         const userId = interaction.user.id;
 
-        const internal = interaction.options.getBoolean('internal') || false;
-        if (internal) {
+        const global = interaction.options.getBoolean('global') || false;
+        if (!global) {
             await this.handleSummerHitLeaderboardInternalCommand(interaction);
             return;
         }
