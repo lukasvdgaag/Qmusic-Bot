@@ -1,8 +1,6 @@
 const WebSocketClient = require('websocket').client;
 const {EmbedBuilder} = require("discord.js");
-
-// const ARTIST_TO_TRACK = 'TAYLOR SWIFT';
-const ARTIST_TO_TRACK = null;
+const SongInfo = require("./radio/SongInfo");
 
 class SocketListener {
 
@@ -10,17 +8,31 @@ class SocketListener {
      * @type {DiscordBot}
      */
     #discordBot;
+    /**
+     * A map of the station id and the song that is currently playing.
+     * @type {Map<string, SongInfo>}
+     */
+    playingNow;
 
     constructor(discordBot) {
         this.#discordBot = discordBot;
+        this.playingNow = new Map();
         this.messages = [
             `["{\\"action\\":\\"join\\",\\"id\\":3,\\"sub\\":{\\"station\\":\\"qmusic_nl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
+            `["{\\"action\\":\\"join\\",\\"id\\":4,\\"sub\\":{\\"station\\":\\"nonstop_qnl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
+            `["{\\"action\\":\\"join\\",\\"id\\":5,\\"sub\\":{\\"station\\":\\"foute_uur_nl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
+            `["{\\"action\\":\\"join\\",\\"id\\":6,\\"sub\\":{\\"station\\":\\"hotnow_qnl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
+            `["{\\"action\\":\\"join\\",\\"id\\":7,\\"sub\\":{\\"station\\":\\"classics_qnl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
+            `["{\\"action\\":\\"join\\",\\"id\\":8,\\"sub\\":{\\"station\\":\\"nederlandstalig_qnl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
+            `["{\\"action\\":\\"join\\",\\"id\\":9,\\"sub\\":{\\"station\\":\\"one_world_radio_qnl\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`,
+            `["{\\"action\\":\\"join\\",\\"id\\":10,\\"sub\\":{\\"station\\":\\"qmusic_limburg\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`
         ]
 
         this.init();
     }
 
     init() {
+        this.playingNow.clear();
         this.client = new WebSocketClient();
 
         this.client.on('connectFailed', (e) => {
@@ -61,25 +73,17 @@ class SocketListener {
                     if (input === 'o' || input === 'h') return;
 
                     try {
-                        input = this.escapeMessage(input);
+                        const songInfo = SongInfo.fromJson(input);
+                        if (!songInfo) return;
 
-                        const startIndex = input.indexOf('"') + 1;
-                        const endIndex = input.lastIndexOf('"');
+                        this.playingNow.set(songInfo.station, songInfo);
 
-                        const json = input.substring(startIndex, endIndex);
+                        this.#discordBot.radioListener.changeSong(songInfo).catch(() => {});
 
-                        let data = JSON.parse(json);
-                        data = JSON.parse(data.data);
-
-                        if (data.station === 'qmusic_nl') {
-                            if (data.entity === 'plays') {
-                                const title = data.data.title;
-                                let artist = data.data.artist.name;
-
-                                // Check if the song needs to be caught
-                                this.#discordBot.catchTheSummerHit.checkForCatches(title, artist).catch(console.log);
-                                this.#discordBot.catchTheArtist.checkForCatch(data.data).catch(console.log);
-                            }
+                        if (songInfo.station === 'qmusic_nl') {
+                            // Check if the song needs to be caught
+                            this.#discordBot.catchTheSummerHit.checkForCatches(songInfo.title, songInfo.artist).catch(console.log);
+                            this.#discordBot.catchTheArtist.checkForCatch(songInfo).catch(console.log);
                         }
                     } catch (e) {
                         //

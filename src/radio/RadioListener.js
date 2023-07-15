@@ -2,16 +2,27 @@ const axios = require("axios");
 const StationInfo = require("./StationInfo");
 
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus} = require('@discordjs/voice');
-const {VoiceBasedChannel} = require("discord.js");
+const {VoiceBasedChannel, EmbedBuilder} = require("discord.js");
 
 class RadioListener {
 
-    constructor() {
+    /**
+     * @type {DiscordBot}
+     */
+    #discordBot;
+
+
+    constructor(discordBot) {
         /**
          * @type {Map<string, StationInfo>}
          */
         this.stations = new Map();
+        this.#discordBot = discordBot;
 
+        this.messageChannelId = null;
+        this.lastMessage = null;
+
+        this.activeStation = null;
         this.activeChannel = null;
         this.player = null;
     }
@@ -52,10 +63,14 @@ class RadioListener {
      *
      * @param {string} stationId
      * @param {VoiceBasedChannel} voiceChannel
+     * @param {string} messageChannelId
      * @returns {Promise<void>}
      */
-    async playStation(stationId, voiceChannel) {
+    async playStation(stationId, voiceChannel, messageChannelId) {
         const station = this.stations.get(stationId);
+
+        this.activeStation = stationId;
+        this.messageChannelId = messageChannelId;
 
         if (this.player && this.player.state.status === AudioPlayerStatus.Playing) {
             const resource = createAudioResource(station.url, {
@@ -92,13 +107,53 @@ class RadioListener {
                 connection.destroy();
             });
         }
+
+        await this.changeSong(this.#discordBot.socket.playingNow.get(stationId));
     }
 
-    stop() {
+    async changeSong(songInfo) {
+        console.log(this.activeChannel, songInfo, this.messageChannelId, this.activeStation);
+        if (!this.activeChannel || !songInfo || !this.messageChannelId || !this.activeStation || this.activeStation !== songInfo.station) return;
+
+        if (this.lastMessage) {
+            this.lastMessage.delete().catch(() => {});
+        }
+
+        const content = `Now playing: **${songInfo.title}** by ${songInfo.artist}`;
+        const embed = new EmbedBuilder()
+            .setTitle(`Now playing: ${songInfo.title}`)
+            .addFields(
+                {name: 'Song title', value: songInfo.title, inline: true},
+                {name: 'Artist', value: songInfo.artist, inline: true},
+            ).setThumbnail(`https://api.qmusic.nl${songInfo.thumbnail}`)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            })
+            .setColor(process.env.MAIN_COLOR)
+
+        if (songInfo.next) {
+            embed.addFields({name: 'Up next', value: `${songInfo.next.title} - ${songInfo.next.artist}`, inline: false})
+        }
+        if (songInfo.spotifyUrl) {
+            embed.addFields({name: 'Listen on Spotify', value: 'https://qmusic.nl/luister/qmusic_nl', inline: false});
+        }
+
+        this.lastMessage = await this.#discordBot.sendMessage({content, embeds: [embed]}, this.messageChannelId);
+    }
+
+    async stop() {
         if (this.player) {
             this.activeChannel = null;
             this.player.stop(true);
             this.player = null;
+            this.messageChannelId = null;
+            this.activeStation = null;
+
+            if (this.lastMessage) {
+                this.lastMessage.delete().catch(() => {});
+                this.lastMessage = null;
+            }
             return true;
         }
         return false;

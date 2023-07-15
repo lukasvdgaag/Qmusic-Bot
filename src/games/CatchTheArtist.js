@@ -50,11 +50,15 @@ class CatchTheArtist {
         this.artistCatchers.get(artist).add(user.username);
     }
 
-    async checkForCatch(data) {
+    /**
+     * @param {SongInfo} songInfo
+     * @returns {Promise<void>}
+     */
+    async checkForCatch(songInfo) {
         if (this.#discordBot.isNightTime()) return;
-        if (await this.checkForUpcoming(data)) return;
+        if (await this.checkForUpcoming(songInfo)) return;
 
-        let artist = data.artist.name;
+        let artist = songInfo.artist;
         if (!this.artistCatchers.has(artist)) return;
 
         const users = this.artistCatchers.get(artist);
@@ -87,14 +91,14 @@ class CatchTheArtist {
             .setTitle(`${artist} is playing right now!!`)
             .setDescription(`${artist} is playing right now on Qmusic. Go send a message in the app!`)
             .setColor(process.env.MAIN_COLOR)
-            .setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480${data.thumbnail}`)
+            .setThumbnail(`https://api.qmusic.nl${songInfo.thumbnail}`)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             })
             .addFields(
-                {name: 'Song title', value: data.title, inline: true},
-                {name: 'Artist', value: data.artist.name, inline: true},
+                {name: 'Song title', value: songInfo.title, inline: true},
+                {name: 'Artist', value: songInfo.artist, inline: true},
             );
 
         if (messageUsers.length > 0) {
@@ -124,7 +128,7 @@ class CatchTheArtist {
 
         const results = await Promise.allSettled(promises);
         let caughtUsers = [];
-        for (let i = 0; i< results.length; i++) {
+        for (let i = 0; i < results.length; i++) {
             const result = results[i];
             if (result.status !== 'fulfilled') continue;
 
@@ -135,12 +139,16 @@ class CatchTheArtist {
         return caughtUsers;
     }
 
-    async checkForUpcoming(data) {
+    /**
+     * @param {SongInfo} songInfo
+     * @returns {Promise<boolean>}
+     */
+    async checkForUpcoming(songInfo) {
         // check if there is a next song
-        if (!data?.next) return;
+        if (!songInfo.next) return false;
 
-        let artist = data.next.artist.name;
-        if (!this.artistCatchers.has(artist)) return;
+        let artist = songInfo.next.artist;
+        if (!this.artistCatchers.has(artist)) return false;
 
         const users = this.artistCatchers.get(artist);
 
@@ -160,15 +168,15 @@ class CatchTheArtist {
             .setTitle(`${artist} is coming up next!`)
             .setDescription(`${artist} is coming up next on Qmusic. Get your app ready!`)
             .setColor(process.env.MAIN_COLOR)
-            .setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480${data.next.thumbnail}`)
+            .setThumbnail(`https://api.qmusic.nl${songInfo.next.thumbnail}`)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             })
             .addFields(
-                {name: 'Song title', value: data.title, inline: true},
-                {name: 'Artist', value: data.artist.name, inline: true},
-                {name: 'Up next', value: `${data.next.title} - ${artist}`, inline: false},
+                {name: 'Song title', value: songInfo.title, inline: true},
+                {name: 'Artist', value: songInfo.artist, inline: true},
+                {name: 'Up next', value: `${songInfo.next.title} - ${artist}`, inline: false},
                 {name: 'Listen live', value: 'https://qmusic.nl/luister/qmusic_nl', inline: false}
             )
 

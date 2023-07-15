@@ -351,7 +351,7 @@ class CommandHandler {
             this.discordBot.radioListener.stop();
         }
 
-        await this.discordBot.radioListener.playStation(station, voiceChannel);
+        await this.discordBot.radioListener.playStation(station, voiceChannel, interaction.channelId);
 
         await this.#sendListeningMessage(interaction, station);
     }

@@ -23,7 +23,7 @@ class DiscordBot {
         });
         this.authBank = authBank;
 
-        this.radioListener = new RadioListener();
+        this.radioListener = new RadioListener(this);
 
         this.#initListeners();
         this.client.login(process.env.DISCORD_TOKEN)
