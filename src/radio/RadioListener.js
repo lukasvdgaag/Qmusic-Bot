@@ -112,7 +112,6 @@ class RadioListener {
     }
 
     async changeSong(songInfo) {
-        console.log(this.activeChannel, songInfo, this.messageChannelId, this.activeStation);
         if (!this.activeChannel || !songInfo || !this.messageChannelId || !this.activeStation || this.activeStation !== songInfo.station) return;
 
         if (this.lastMessage) {
