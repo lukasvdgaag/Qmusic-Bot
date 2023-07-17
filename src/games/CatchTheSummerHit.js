@@ -203,7 +203,12 @@ class CatchTheSummerHit {
             const delay = Math.random() * 1000 * 10 + 5000;
             promises.push(new Promise((resolve) => {
                 setTimeout(async () => {
-                    resolve(await this.catchSongForUser(username, songInfo.track_id));
+                    try {
+                        const res = await this.catchSongForUser(username, songInfo.track_id);
+                        resolve(res);
+                    } catch (e) {
+                        resolve(undefined);
+                    }
                 }, delay);
             }));
         }
@@ -215,7 +220,7 @@ class CatchTheSummerHit {
         let caughtUsers = [];
         for (let i = 0; i < results.length; i++) {
             const result = results[i];
-            if (result.status !== 'fulfilled') {
+            if (result.status !== 'fulfilled' || !result.value) {
                 continue;
             }
 
@@ -266,40 +271,6 @@ class CatchTheSummerHit {
             embeds: [embed]
         })
 
-    }
-
-    async catchSong(songTitle, artistName) {
-        if (!this.songsCatchers.has(songTitle.toUpperCase())) {
-            return [];
-        }
-
-        const promises = [];
-        let songInfo = this.songsCatchers.get(songTitle.toUpperCase());
-
-        if (songInfo.artist_name !== artistName) {
-            return [];
-        }
-
-        const songUsers = songInfo.getUsers();
-        for (const username of songUsers) {
-            promises.push(this.catchSongForUser(username, songInfo.track_id));
-        }
-
-        const results = await Promise.allSettled(promises);
-        // check if all the axios requests have an OK status
-        let catchedUsers = [];
-        for (let i = 0; i < results.length; i++) {
-            const result = results[i];
-            if (result.status !== 'fulfilled') {
-                continue;
-            }
-
-            if (result.value.status === 200 || result.value.status === 201) {
-                catchedUsers.push(songUsers[i]);
-            }
-        }
-
-        return catchedUsers;
     }
 
 }

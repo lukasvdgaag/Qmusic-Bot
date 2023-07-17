@@ -130,7 +130,7 @@ class CatchTheArtist {
         let caughtUsers = [];
         for (let i = 0; i < results.length; i++) {
             const result = results[i];
-            if (result.status !== 'fulfilled') continue;
+            if (result.status !== 'fulfilled' || !result.value) continue;
 
             if (result.value.status === 200 || result.value.status === 201) {
                 caughtUsers.push(users[i]);

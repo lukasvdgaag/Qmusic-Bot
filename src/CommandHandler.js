@@ -172,9 +172,7 @@ class CommandHandler {
         const contestantInfos = await Promise.allSettled(promises);
         for (let i = 0; i < contestantInfos.length; i++) {
             const result = contestantInfos[i];
-            if (result.status !== 'fulfilled') {
-                console.log(result)
-                console.log(`Failed to fetch highscores for user ${users[i].username}`)
+            if (result.status !== 'fulfilled'|| !result.value) {
                 continue;
             }
 

@@ -40,7 +40,21 @@ Before you can run the bot, you need to configure it.
         "password": "yourPassword",
         "discord_id": "your_discord_account_id",
         "expires": null,
-        "token": null
+        "token": null,
+        "settings": {
+            "catch_the_summer_hit": {
+                "enabled": true,
+                "notify": true,
+                "catch_at_night": true
+            },
+            "catch_the_artist": {
+                "enabled": false,
+                "artist_name": "TAYLOR SWIFT",
+                "notify": true,
+                "send_app_message": false,
+                "notify_when_upcoming": false
+            }
+        }
     }
 }
 ```
