@@ -3,6 +3,7 @@ const fs = require("fs").promises;
 const jwt = require("jsonwebtoken");
 const Account = require("./Account");
 const Authenticator = require("./Authenticator");
+const {getNow} = require("../utils/TimeUtils");
 
 class AuthBank {
 
@@ -112,7 +113,7 @@ class AuthBank {
         if (!exp) return true;
 
         // Check if the token is expired or will expire in the next hour
-        const currentTime = Math.floor(Date.now() / 1000);
+        const currentTime = Math.floor(getNow() / 1000);
         return exp < currentTime + 3600;
     }
 
@@ -151,7 +152,7 @@ class AuthBank {
 
         if (save) await this.saveUsers();
 
-        const currentTime = Math.floor(Date.now() / 1000);
+        const currentTime = Math.floor(getNow() / 1000);
         const timeToRefresh = Math.max(5, user.expires - currentTime - 3600);
         console.log(`Next refresh for ${username} in ${timeToRefresh} seconds`);
         setTimeout(async () => {
