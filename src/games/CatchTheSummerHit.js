@@ -9,6 +9,11 @@ class CatchTheSummerHit {
      */
     #discordBot;
 
+    /**
+     * @type {boolean}
+     */
+    available;
+
     constructor(discordBot) {
         this.#discordBot = discordBot;
         /**
@@ -23,6 +28,10 @@ class CatchTheSummerHit {
     }
 
     async #init() {
+        // checking game availability
+        this.available = await this.#isGameAvailable();
+        if (!this.available) this.trackOfTheDayLastUpdated = Date.now();
+
         await this.loadTrackOfTheDay();
         await this.initContestantsTracks();
 
@@ -32,11 +41,37 @@ class CatchTheSummerHit {
         }, 1000 * 60 * 5);
     }
 
-    async checkForNewDay() {
+    async #isGameAvailable() {
+        try {
+            const response = await axios.get('https://api.qmusic.nl/2.4/cth/games/17');
+
+            if (response.status !== 200) return false;
+
+            // check if json body contains "game" and if game.currentState === 'ended' or the game.endDate is in the past
+            return response.data?.game?.currentState !== 'ended' && new Date(response.data?.game?.endsAt) > Date.now();
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async checkForNewDay(force = false) {
+        if (!this.available) {
+            const lastUpdated = this.trackOfTheDayLastUpdated;
+            const isNextDay = this.#isNextDay(lastUpdated ? new Date(lastUpdated) : null);
+
+            if (isNextDay) {
+                this.available = await this.#isGameAvailable();
+                force = this.available;
+                if (!this.available) return;
+            } else {
+                return;
+            }
+        }
+
         const trackOfTheDayWasNull = this.trackOfTheDay == null;
         const isNextDay = this.#isNextDay(this.trackOfTheDay ? new Date(this.trackOfTheDay?.date) : null);
 
-        if (trackOfTheDayWasNull || isNextDay) {
+        if (force || trackOfTheDayWasNull || isNextDay) {
             await this.loadTrackOfTheDay();
             await this.initContestantsTracks();
         }
@@ -58,6 +93,8 @@ class CatchTheSummerHit {
     }
 
     async loadTrackOfTheDay() {
+        if (!this.available) return;
+
         try {
             const response = await axios.get('https://api.qmusic.nl/2.4/cth/games/17/track_of_the_day');
 
@@ -80,6 +117,8 @@ class CatchTheSummerHit {
     }
 
     async initContestantsTracks() {
+        if (!this.available) return;
+
         let trackOfTheDayTitle = this.trackOfTheDay?.track_title.toUpperCase();
         const users = this.#discordBot.authBank.getUsers();
 
@@ -94,6 +133,8 @@ class CatchTheSummerHit {
     }
 
     async initContestantTracks(username) {
+        if (!this.available) return;
+
         const account = this.#discordBot.authBank.getUser(username);
         // If the user has not enabled the game, skip them.
         if (!account.settings.catch_the_summer_hit.enabled) return;
@@ -123,6 +164,8 @@ class CatchTheSummerHit {
     }
 
     async getContestantInfo(username) {
+        if (!this.available) return undefined;
+
         const user = this.#discordBot.authBank.getUser(username);
         if (!user) return undefined;
 
@@ -140,6 +183,8 @@ class CatchTheSummerHit {
     }
 
     async catchSongForUser(username, trackId) {
+        if (!this.available) return undefined;
+
         const user = this.#discordBot.authBank.getUser(username);
         if (!user) return;
 
@@ -155,8 +200,10 @@ class CatchTheSummerHit {
     }
 
     async getHighscoresForUser(username, limit = 10, returnRaw = false) {
+        if (!this.available) return undefined;
+
         const user = this.#discordBot.authBank.getUser(username);
-        if (!user) return;
+        if (!user) return undefined;
 
         try {
             const response = axios.get(`https://api.qmusic.nl/2.4/cth/games/17/highscores`, {
@@ -177,6 +224,8 @@ class CatchTheSummerHit {
     }
 
     async checkForCatches(songTitle, artistName) {
+        if (!this.available) return;
+
         if (!this.songsCatchers.has(songTitle.toUpperCase())) {
             return [];
         }

@@ -11,6 +11,11 @@ class CommandHandler {
     }
 
     async handleSummerHitAboutCommand(interaction) {
+        if (!this.discordBot.catchTheSummerHit.available) {
+            await this.#sendGameNotAvailableMessage(interaction)
+            return;
+        }
+
         const embed = new EmbedBuilder()
             .setTitle("🏝️ Catch The Summer Hit")
             .setDescription("Het voelt alsof we dit jaar nog maar weinig zon hebben gezien, dus we hebben hoge verwachtingen voor de zomer! " +
@@ -49,6 +54,10 @@ class CommandHandler {
     }
 
     async handleSummerHitTrackOfTheDayCommand(interaction) {
+        if (!this.discordBot.catchTheSummerHit.available) {
+            await this.#sendGameNotAvailableMessage(interaction)
+            return;
+        }
         // Check if the track of the day needs to be updated
         await this.discordBot.catchTheSummerHit.checkForNewDay();
 
@@ -59,6 +68,10 @@ class CommandHandler {
     }
 
     async handleSummerHitStatsCommand(interaction) {
+        if (!this.discordBot.catchTheSummerHit.available) {
+            await this.#sendGameNotAvailableMessage(interaction)
+            return;
+        }
         const userId = interaction.user.id;
 
         const user = this.discordBot.authBank.getUserByDiscordId(userId);
@@ -113,6 +126,10 @@ class CommandHandler {
     }
 
     async handleSummerHitLeaderboardCommand(interaction) {
+        if (!this.discordBot.catchTheSummerHit.available) {
+            await this.#sendGameNotAvailableMessage(interaction)
+            return;
+        }
         const userId = interaction.user.id;
 
         const global = interaction.options.getBoolean('global') || false;
@@ -567,6 +584,19 @@ class CommandHandler {
         const embed = new EmbedBuilder()
             .setTitle("❌ Invalid station")
             .setDescription("This is not a valid station. Please use one of the following stations: " + Array.from(this.discordBot.radioListener.stations.keys()).join(', '))
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    }
+
+    async #sendGameNotAvailableMessage(interaction) {
+        const embed = new EmbedBuilder()
+            .setTitle("❌ Game not available")
+            .setDescription("This game is currently not available. Please try again later.")
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
