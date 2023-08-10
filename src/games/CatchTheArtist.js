@@ -1,5 +1,6 @@
 const {EmbedBuilder} = require("discord.js");
 const QMessagesManager = require("../QMessagesManager");
+const {getNowDate} = require("../utils/TimeUtils");
 
 class CatchTheArtist {
 
@@ -50,12 +51,19 @@ class CatchTheArtist {
         this.artistCatchers.get(artist).add(user.username);
     }
 
+    #isNightTime() {
+        const now = getNowDate();
+        const hour = now.getUTCHours();
+
+        return hour < 6;
+    }
+
     /**
      * @param {SongInfo} songInfo
      * @returns {Promise<void>}
      */
     async checkForCatch(songInfo) {
-        if (this.#discordBot.isNightTime()) return;
+        if (this.#isNightTime()) return;
         if (await this.checkForUpcoming(songInfo)) return;
 
         let artist = songInfo.artist;

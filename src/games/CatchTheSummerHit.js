@@ -1,6 +1,7 @@
 const axios = require('axios');
 const SummerHitInfo = require("./SummerHitInfo");
 const {EmbedBuilder} = require("discord.js");
+const {getNowDate, getNow} = require("../utils/TimeUtils");
 
 class CatchTheSummerHit {
 
@@ -79,11 +80,11 @@ class CatchTheSummerHit {
 
     #isNextDay(date) {
         if (!date) return true;
-        const today = new Date();
+        const today = getNowDate();
 
-        return today.getUTCFullYear() !== date.getUTCFullYear() ||
-        today.getUTCMonth() !== date.getUTCMonth() ||
-        today.getUTCDate() !== date.getUTCDate();
+        return today.getFullYear() !== date.getFullYear() ||
+        today.getMonth() !== date.getMonth() ||
+        today.getDate() !== date.getDate();
     }
 
     removeUser(username) {
@@ -105,8 +106,8 @@ class CatchTheSummerHit {
             }
 
             this.trackOfTheDay = response.data.track_of_the_day;
-            this.trackOfTheDayLastUpdated = Date.now();
-            if (this.trackOfTheDay) this.trackOfTheDay.date = Date.now();
+            this.trackOfTheDayLastUpdated = getNow();
+            if (this.trackOfTheDay) this.trackOfTheDay.date = getNow();
 
             let embed = this.#discordBot.commandHandler.getTrackOfTheDayEmbed(this.trackOfTheDay);
             await this.#discordBot.sendMessage({embeds: [embed]})

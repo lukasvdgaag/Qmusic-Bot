@@ -7,6 +7,7 @@ const CatchTheSummerHit = require("./games/CatchTheSummerHit");
 const SocketListener = require("./SocketListener");
 const CatchTheArtist = require("./games/CatchTheArtist");
 const RadioListener = require("./radio/RadioListener");
+const {getNowDate} = require("./utils/TimeUtils");
 
 class DiscordBot {
 
@@ -296,7 +297,7 @@ class DiscordBot {
     }
 
     isNightTime() {
-        const now = new Date();
+        const now = getNowDate();
         const hour = now.getHours();
         return hour >= 3 && hour < 6;
     }
