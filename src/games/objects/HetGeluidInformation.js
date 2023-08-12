@@ -23,6 +23,14 @@ class HetGeluidInformation {
         return new HetGeluidInformation(data.amount, data.audio);
     }
 
+    /**
+     * Get the name of the audio file
+     * @returns {string}
+     */
+    getAudioName() {
+        return this.audio.split('/').pop();
+    }
+
 }
 
 module.exports = HetGeluidInformation;

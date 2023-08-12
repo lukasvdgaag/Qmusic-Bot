@@ -14,9 +14,14 @@ class AccountSettings {
         notify_when_upcoming: false,
     }
 
+    het_geluid = {
+        auto_signup: false,
+    }
+
     constructor(jsonData) {
         this.#loadCatchTheSummerHit(jsonData.catch_the_summer_hit);
         this.#loadCatchTheArtist(jsonData.catch_the_artist);
+        this.#loadHetGeluid(jsonData.het_geluid);
     }
 
     #loadCatchTheSummerHit(jsonData) {
@@ -34,6 +39,12 @@ class AccountSettings {
             notify: jsonData?.notify ?? this.catch_the_artist.notify,
             send_app_message: jsonData?.send_app_message ?? this.catch_the_artist.send_app_message,
             notify_when_upcoming: jsonData?.notify_when_upcoming ?? this.catch_the_artist.notify_when_upcoming,
+        }
+    }
+
+    #loadHetGeluid(jsonData) {
+        this.het_geluid = {
+            auto_signup: jsonData?.auto_signup ?? this.het_geluid.auto_signup,
         }
     }
 

@@ -11,10 +11,12 @@ This bot can automatically send these messages and perform these actions for you
 
 ### Currently Supported Games
 
-- 🏝️ **Catch The Summer Hit**: Catch a song on your list when it is playing on the radio by clicking a button in the app. You gain points for every song you catch
+- 🏝️ **Catch The Summer Hit**: Catch a song on your list when it is playing on the radio by clicking a button in the app. You gain points for every song you
+  catch
   and gain a streak. The more points you have, the higher you are on the leaderboard. The top 50 players at the end of the week win a prize, and the top 3-5
   wins a grant prize.<br>The bot can catch these songs automatically for you.
-- 🎙️ **Catch The Artist**: Send an app message when a specific artist is playing on the radio to win prizes (usually concert tickets). You can be notified when the
+- 🎙️ **Catch The Artist**: Send an app message when a specific artist is playing on the radio to win prizes (usually concert tickets). You can be notified when
+  the
   artist is coming up next, currently playing, and the bot can also send the app message for you.
 - 🔊 **Het Geluid**: Guess the sound that is playing on the radio to win the prize money. You can sign up to guess for the current day using the bot, as well as
   retrieve all the information about the worth of the sound, the previous guesses, and maybe a hint.
@@ -66,6 +68,9 @@ Before you can run the bot, you need to configure it.
                 "notify": true,
                 "send_app_message": false,
                 "notify_when_upcoming": false
+            },
+            "het_geluid": {
+                "auto_signup": false
             }
         }
     }
@@ -142,6 +147,7 @@ Below is a list of all the API endpoints that are used by the bot.
 | `/hetgeluid info`                                                                            | Get the current worth of Het Geluid and the link to audio of Het Geluid.                                                                                                                                                                                                                                                                                    |
 | `/hetgeluid signup [username]`                                                               | Sign up for today's/next day's guessing moment.                                                                                                                                                                                                                                                                                                             |
 | `/hetgeluid findanswer <answer>`                                                             | Check if your answer has already been guessed by someone else (and is therefore wrong). Be as general as possible when using this. It is not recommended to use full sentences as the accuracy will be low.                                                                                                                                                 |
+| `/hetgeluid settings [auto_signup] [username]`                                               | Change the settings of the game for an user. Whether you want to enable automatic sign ups when they become available.                                                                                                                                                                                                                                      |
 
 ## Authentication Process
 

@@ -33,6 +33,10 @@ class HetGeluidAttempt {
         return new HetGeluidAttempt(data.answer, data.name, data.location, data.guessed_at);
     }
 
+    highlighted(text) {
+        return this.answer.replace(new RegExp(`(${text})`, 'gi'), '**__$1__**');
+    }
+
 }
 
 module.exports = HetGeluidAttempt;
