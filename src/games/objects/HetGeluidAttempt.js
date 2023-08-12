@@ -1,8 +1,20 @@
 class HetGeluidAttempt {
 
+    /**
+     * @type {string}
+     */
     answer;
+    /**
+     * @type {string}
+     */
     name;
+    /**
+     * @type {string}
+     */
     location;
+    /**
+     * @type {Date}
+     */
     guessed_at;
 
     constructor(answer, name, location, guessed_at) {
