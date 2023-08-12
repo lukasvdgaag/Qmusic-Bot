@@ -1,6 +1,6 @@
 const {
     Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction,
-    SlashCommandUserOption, MessagePayload, SlashCommandBooleanOption
+    SlashCommandUserOption, MessagePayload, SlashCommandBooleanOption, Attachment
 } = require("discord.js");
 const CommandHandler = require("./CommandHandler");
 const CatchTheSummerHit = require("./games/CatchTheSummerHit");
@@ -8,6 +8,7 @@ const SocketListener = require("./SocketListener");
 const CatchTheArtist = require("./games/CatchTheArtist");
 const RadioListener = require("./radio/RadioListener");
 const {getNowDate} = require("./utils/TimeUtils");
+const HetGeluid = require("./games/HetGeluid");
 
 class DiscordBot {
 
@@ -38,6 +39,7 @@ class DiscordBot {
             this.catchTheSummerHit = new CatchTheSummerHit(this);
             this.catchTheArtist = new CatchTheArtist(this);
             this.commandHandler = new CommandHandler(this);
+            this.hetGeluid = new HetGeluid(this);
             this.socket = new SocketListener(this);
 
             console.log(`Bot is ready. Logged in as ${this.client.user.tag}`);
@@ -92,6 +94,11 @@ class DiscordBot {
         /qmusic addaccount <username> <password> [user]
         /qmusic removeaccount [username]
         /qmusic listen [station]
+
+        /hetgeluid info
+        /hetgeluid signup [username]
+        /hetgeluid findanswer <answer>
+        /hetgeluid settings [auto_signup] [username]
          */
         const commands = [
             new SlashCommandBuilder()
@@ -221,7 +228,49 @@ class DiscordBot {
                             .setName('notify_when_upcoming')
                             .setDescription('Whether you want to receive a notification when the artist is coming up')
                     )
+                ),
+            new SlashCommandBuilder()
+                .setName("hetgeluid")
+                .setDescription("Qmusic's Het Geluid game")
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('info')
+                    .setDescription('Get the current worth of Het Geluid and the link to audio of Het Geluid')
                 )
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('signup')
+                    .setDescription("Sign up for today's/next day's guessing moment")
+                    .addStringOption(
+                        new SlashCommandStringOption()
+                            .setName('username')
+                            .setDescription('Optional username of the user to sign up for')
+                            .setRequired(false)
+                    )
+                )
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('findanswer')
+                    .setDescription('Look up previous wrong attempts of other people')
+                    .addStringOption(
+                        new SlashCommandStringOption()
+                            .setName('answer')
+                            .setDescription('The answer to look up')
+                            .setRequired(true)
+                    )
+                )
+                .addSubcommand(new SlashCommandSubcommandBuilder()
+                    .setName('settings')
+                    .setDescription('Change your Het Geluid settings')
+                    .addBooleanOption(
+                        new SlashCommandBooleanOption()
+                            .setName('auto_signup')
+                            .setDescription('Whether you want to automatically sign up for the next guessing moment')
+                            .setRequired(false)
+                    ).addStringOption(
+                        new SlashCommandStringOption()
+                            .setName('username')
+                            .setDescription('The username of the user to change the settings of')
+                            .setRequired(false)
+                    )
+                ),
         ];
 
         this.client.application.commands.set(commands).catch(console.error);
@@ -277,6 +326,23 @@ class DiscordBot {
                 switch (subCommand) {
                     case 'settings':
                         await this.commandHandler.handleCatchArtistSettingsCommand(interaction);
+                        break;
+                }
+            } else if (interaction.commandName === 'hetgeluid') {
+                const subCommand = interaction.options.getSubcommand(false);
+
+                switch (subCommand) {
+                    case 'info':
+                        await this.commandHandler.handleHetGeluidInfoCommand(interaction);
+                        break;
+                    case 'signup':
+                        await this.commandHandler.handleHetGeluidSignupCommand(interaction);
+                        break;
+                    case 'findanswer':
+                        await this.commandHandler.handleHetGeluidFindAnswerCommand(interaction);
+                        break;
+                    case 'settings':
+                        await this.commandHandler.handleHetGeluidSettingsCommand(interaction);
                         break;
                 }
             }

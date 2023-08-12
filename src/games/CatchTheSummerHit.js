@@ -1,5 +1,5 @@
 const axios = require('axios');
-const SummerHitInfo = require("./SummerHitInfo");
+const SummerHitInfo = require("./objects/SummerHitInfo");
 const {EmbedBuilder} = require("discord.js");
 const {getNowDate, getNow} = require("../utils/TimeUtils");
 

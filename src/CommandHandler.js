@@ -1,5 +1,6 @@
-const {EmbedBuilder} = require("discord.js");
+const {EmbedBuilder, ActionRowBuilder, ButtonBuilder} = require("discord.js");
 const {joinVoiceChannel, createAudioPlayer} = require("@discordjs/voice");
+const {ButtonStyle} = require("discord-api-types/v8");
 
 class CommandHandler {
 
@@ -189,7 +190,7 @@ class CommandHandler {
         const contestantInfos = await Promise.allSettled(promises);
         for (let i = 0; i < contestantInfos.length; i++) {
             const result = contestantInfos[i];
-            if (result.status !== 'fulfilled'|| !result.value) {
+            if (result.status !== 'fulfilled' || !result.value) {
                 continue;
             }
 
@@ -272,6 +273,21 @@ class CommandHandler {
     }
 
     async handleQmusicRemoveAccountCommand(interaction) {
+        const user = await this.#getTargetUser(interaction);
+        if (!user) return;
+
+        this.discordBot.catchTheSummerHit.removeUser(user.username);
+        await this.discordBot.authBank.removeUser(user.username);
+
+        await this.#sendAccountRemovedMessage(interaction, user.username);
+    }
+
+    /**
+     * Get the target user for the command.
+     * @param interaction
+     * @returns {Promise<Account|null>}
+     */
+    async #getTargetUser(interaction) {
         let userId = interaction.user.id;
 
         const username = interaction.options.getString('username');
@@ -281,20 +297,16 @@ class CommandHandler {
             user = this.discordBot.authBank.getUser(username);
             if (user == null) {
                 await this.#sendNoAccountFoundMessage(interaction, username);
-                return;
+                return null;
             }
         } else {
             user = this.discordBot.authBank.getUserByDiscordId(userId);
             if (user == null) {
                 await this.#sendUnauthorizedMessage(interaction);
-                return;
+                return null;
             }
         }
-
-        this.discordBot.catchTheSummerHit.removeUser(user.username);
-        await this.discordBot.authBank.removeUser(user.username);
-
-        await this.#sendAccountRemovedMessage(interaction, user.username);
+        return user;
     }
 
     async handleSummerHitSettingsCommand(interaction) {
@@ -485,6 +497,129 @@ class CommandHandler {
         return message;
     }
 
+    async handleHetGeluidInfoCommand(interaction) {
+        const soundInfo = await this.discordBot.hetGeluid.fetchSoundInfo();
+
+        if (!soundInfo) return await this.#sendHetGeluidSoundUnavailable(interaction);
+
+        const answers = await this.discordBot.hetGeluid.fetchAnswers();
+
+        let audioName = soundInfo.getAudioName();
+        const embed = new EmbedBuilder()
+            .setTitle("🔊 Het Geluid")
+            .addFields(
+                {name: 'Value', value: `€ ${new Intl.NumberFormat('nl-NL').format(soundInfo.amount)}`, inline: true},
+                {name: 'Audio Name', value: `\`${audioName.replace('.mp3', '')}\``, inline: true}
+            )
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            });
+
+        if (answers) {
+            embed.addFields(
+                {name: 'Attempts', value: `${answers.length} wrong attempts`, inline: true},
+            )
+        }
+
+        await interaction.reply({
+            embeds: [embed],
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setURL(soundInfo.audio)
+                        .setStyle(ButtonStyle.Link)
+                        .setLabel('Listen to the sound!')
+                )
+            ]
+        });
+    }
+
+    async handleHetGeluidSignupCommand(interaction) {
+        const user = await this.#getTargetUser(interaction);
+        if (!user) return;
+
+        let currentSignupMoment = await this.discordBot.hetGeluid.getCurrentSignUpMoment();
+        if (!currentSignupMoment) {
+            console.log('Het Geluid is not available at the moment');
+            return await this.#sendHetGeluidSoundUnavailable(interaction);
+        }
+
+        const subscribed = await this.discordBot.hetGeluid.hasUserSubscribed(user.username, currentSignupMoment);
+        console.log('subscribed', subscribed)
+        if (subscribed) {
+            return await this.#sendEmbedMessage(
+                interaction,
+                'Already subscribed',
+                `You have already signed up for Het Geluid of <t:${currentSignupMoment.hiddenAt.getTime() / 1000}:D>. ` +
+                `You can sign up for the next day in <t:${currentSignupMoment.hiddenAt.getTime() / 1000}:R>.`
+            );
+        }
+
+        currentSignupMoment = await this.discordBot.hetGeluid.subscribeUser(user.username);
+        if (!currentSignupMoment) return await this.#sendHetGeluidSoundUnavailable(interaction);
+
+        await this.#sendEmbedMessage(
+            interaction,
+            'You signed up for Het Geluid!',
+            `You have signed up for Het Geluid of <t:${currentSignupMoment.hiddenAt.getTime() / 1000}:D>.\nLet's hope you get called!`,
+            '✅'
+        );
+    }
+
+    async handleHetGeluidFindAnswerCommand(interaction) {
+        const answer = interaction.options.getString('answer');
+
+        const answers = await this.discordBot.hetGeluid.findAnswer(answer);
+
+        if (!answers || answers.length === 0) {
+            return await this.#sendEmbedMessage(
+                interaction,
+                'No matches found!',
+                `There were no previous answers that matched \`${answer}\`. Make sure that you didn't enter an entire sentence and that you spelled it correctly; otherwise, there's potential...`,
+                '✅',
+                false
+            );
+        }
+
+        await this.#sendEmbedMessage(
+            interaction,
+            `${answers.length} matches found`,
+            answers.map(a => `- _"${a.highlighted(answer)}"_ - guessed by ${a.name} on <t:${a.guessed_at.getTime() / 1000}:f>`).join('\n'),
+            '🫠',
+            false
+        )
+    }
+
+    async handleHetGeluidSettingsCommand(interaction) {
+        const user = await this.#getTargetUser(interaction);
+        if (!user) return;
+
+        const autoSignup = interaction.options.getBoolean('auto_signup');
+
+        const settings = user.settings.het_geluid;
+        if (autoSignup != null) settings.auto_signup = autoSignup;
+
+        if (autoSignup != null) {
+            await this.discordBot.authBank.saveUsers();
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("⚙️ Het Geluid Settings")
+            .setDescription(`Your Het Geluid settings have been updated.`)
+            .addFields(
+                {name: 'Auto Signup', value: settings.auto_signup ? '✅ Enabled' : '❌ Disabled', inline: true},
+            )
+            .setColor(process.env.MAIN_COLOR)
+            .setFooter({
+                text: "Q sounds better with you!",
+                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
+            })
+
+        await interaction.reply({embeds: [embed]});
+    }
+
     #getLeaderboardUsers(leaderboard) {
         let message = '';
 
@@ -529,198 +664,151 @@ class CommandHandler {
         return result;
     }
 
-    async #sendNotListeningMessage(interaction) {
+    async #sendEmbedMessage(interaction, title, description, emote = '❌', ephemeral = true) {
         const embed = new EmbedBuilder()
-            .setTitle("❌ Not listening")
-            .setDescription("You are not listening to a radio station. Please use the `/qmusic listen` command to start listening to a radio station.")
+            .setTitle((emote ? `${emote} ` : '') + title)
+            .setDescription(description)
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             });
-        await interaction.reply({embeds: [embed]});
+
+        await interaction.reply({embeds: [embed], ephemeral: ephemeral});
+    }
+
+    async #sendNotListeningMessage(interaction) {
+        return await this.#sendEmbedMessage(
+            interaction,
+            "Not listening",
+            "You are not listening to a radio station. Please use the `/qmusic listen` command to start listening to a radio station."
+        );
     }
 
     async #sendStoppedListeningMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("📻 Stopped listening")
-            .setDescription("You are no longer listening to the radio.")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-        await interaction.reply({embeds: [embed]});
+        await this.#sendEmbedMessage(
+            interaction,
+            "📻 Stopped listening",
+            "You are no longer listening to the radio.",
+            null,
+            false
+        );
     }
 
     async #sendListeningMessage(interaction, stationId) {
         const station = this.discordBot.radioListener.stations.get(stationId);
 
-        const embed = new EmbedBuilder()
-            .setTitle("📻 Listening to " + station.name)
-            .setDescription("You are now listening to " + station.name + ".")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-        await interaction.reply({embeds: [embed]});
+        await this.#sendEmbedMessage(
+            interaction,
+            "📻 Listening to " + station.name,
+            "You are now listening to " + station.name + ".",
+            null,
+            false
+        );
     }
 
-    /*async #sendAlreadyListeningMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("❌ Already listening")
-            .setDescription("You are already listening to a radio station. Please use the `/qmusic stop` command to stop listening to the radio before you can listen to another station.")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        await interaction.reply({embeds: [embed], ephemeral: true});
-    }*/
-
     async #sendInvalidStationMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("❌ Invalid station")
-            .setDescription("This is not a valid station. Please use one of the following stations: " + Array.from(this.discordBot.radioListener.stations.keys()).join(', '))
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return await this.#sendEmbedMessage(
+            interaction,
+            'Invalid station',
+            'This is not a valid station. Please use one of the following stations: ' +
+            Array.from(this.discordBot.radioListener.stations.keys()).join(', ')
+        );
     }
 
     async #sendGameNotAvailableMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("❌ Game not available")
-            .setDescription("This game is currently not available. Please try again later.")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
+        return await this.#sendEmbedMessage(
+            interaction,
+            'Game not available',
+            'This game is currently not available. Please try again later.'
+        );
+    }
 
-        await interaction.reply({embeds: [embed], ephemeral: true});
+    async #sendHetGeluidSoundUnavailable(interaction) {
+        return this.#sendEmbedMessage(
+            interaction,
+            'Something went wrong',
+            "Something didn't go right when we looked up the information about Het Geluid. Please try again later."
+        );
     }
 
     async #sendNotInVoiceChannelMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("❌ Not in a voice channel")
-            .setDescription("You need to be in a voice channel to use this command.")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return this.#sendEmbedMessage(
+            interaction,
+            'Not in a voice channel',
+            'You need to be in a voice channel to use this command.'
+        );
     }
 
     async #sendGameUnavailableMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("🔒 Game unavailable")
-            .setDescription("This game is currently unavailable to you. This is likely due to the fact that you have not started the game yet in your app. " +
-                "You can do this by clicking the **SummerHit** button in the bottom navigation bar of the app.\n\n" +
-                "If you can't see this button, make sure that you entered your phone number, name, and address in your account details.")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        // reply with ephemeral message
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return this.#sendEmbedMessage(
+            interaction,
+            'Game unavailable',
+            "This game is currently unavailable to you. This is likely due to the fact that you have not started the game yet in your app " +
+            "or that Qmusic is currently not hosting this game. " +
+            "Check if you see the game's button in the bottom navigation bar of the app.\n\n" +
+            "If you can't see this button, make sure that you entered your phone number, name, and address in your account details, " +
+            "and if Qmusic is actually hosting the game.",
+            '🔒'
+        );
     }
 
     async #sendAccountLinkedMessage(interaction, username, userId) {
-        const embed = new EmbedBuilder()
-            .setTitle("✅ Account linked")
-            .setDescription(`A Qmusic account with the username \`${username}\` has been successfully linked to <@${userId}>'s Discord account. They can now use the other Qmusic commands.`)
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        // reply with ephemeral message
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return await this.#sendEmbedMessage(
+            interaction,
+            "Account linked",
+            `A Qmusic account with the username \`${username}\` has been successfully linked to <@${userId}>'s Discord account. They can now use the other Qmusic commands.`,
+            '✅'
+        );
     }
 
     async #sendAccountAlreadyLinkedMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("🔒 Account already added")
-            .setDescription("This Qmusic account is already known by the bot. If you want to replace this account or change it credentials, please remove the account first. " +
-                "You can do this by using the \u003C/qmusic removeaccount:1125771007748210728> command.")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        // reply with ephemeral message
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return await this.#sendEmbedMessage(
+            interaction,
+            "Account already linked",
+            "This Qmusic account is already known by the bot. If you want to replace this account or change it credentials, please remove the account first. " +
+            "You can do this by using the \u003C/qmusic removeaccount:1125771007748210728> command.",
+            '🔒'
+        );
     }
 
     async #sendInvalidCredentialsMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("🔒 Invalid credentials")
-            .setDescription("The credentials you provided were invalid. Please check if you entered the correct username (email) and password and try again.")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        // reply with ephemeral message
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return await this.#sendEmbedMessage(
+            interaction,
+            'Invalid credentials',
+            'The credentials you provided were invalid. Please check if you entered the correct username (email) and password and try again.',
+            '🔒'
+        );
     }
 
     async #sendAccountRemovedMessage(interaction, username) {
-        const embed = new EmbedBuilder()
-            .setTitle("✅ Account removed")
-            .setDescription(`The Qmusic account with the username \`${username}\` has been successfully removed from the bot.`)
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        // reply with ephemeral message
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return await this.#sendEmbedMessage(
+            interaction,
+            "Account removed",
+            `The Qmusic account with the username \`${username}\` has been successfully removed from the bot.`,
+            '✅'
+        );
     }
 
     async #sendNoAccountFoundMessage(interaction, username) {
-        const embed = new EmbedBuilder()
-            .setTitle("🔒 No account found")
-            .setDescription(`No Qmusic account was found with the username \`${username}\`. You can add their account` +
-                `with the \u003C/qmusic addaccount:1125771007748210728> command or ask an admin to do this for you.\n\n` +
-                "*Please note that in order to link your account, you need to provide your __username__ (email) and __password__. Only share this with people you trust.*")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        // reply with ephemeral message
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return await this.#sendEmbedMessage(
+            interaction,
+            "No account found",
+            `No Qmusic account was found with the username \`${username}\`. You can add their account` +
+            `with the \u003C/qmusic addaccount:1125771007748210728> command or ask an admin to do this for you.\n\n` +
+            "*Please note that in order to link your account, you need to provide your __username__ (email) and __password__. Only share this with people you trust.*",
+        );
     }
 
     async #sendUnauthorizedMessage(interaction) {
-        const embed = new EmbedBuilder()
-            .setTitle("🔒 No account found")
-            .setDescription("No Qmusic account was found in the saved accounts list. In order to use this command, please link your account first " +
-                "with the \u003C/qmusic addaccount:1125771007748210728> command or ask an admin to do this for you.\n\n" +
-                "*Please note that in order to link your account, you need to provide your __username__ (email) and __password__. Only share this with people you trust.*")
-            .setColor(process.env.MAIN_COLOR)
-            .setFooter({
-                text: "Q sounds better with you!",
-                iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
-            });
-
-        await interaction.reply({embeds: [embed], ephemeral: true});
+        return await this.#sendEmbedMessage(
+            interaction,
+            'No account found',
+            "No Qmusic account was found in the saved accounts list. In order to use this command, please link your account first " +
+            "with the \u003C/qmusic addaccount:1125771007748210728> command or ask an admin to do this for you.\n\n" +
+            "*Please note that in order to link your account, you need to provide your __username__ (email) and __password__. Only share this with people you trust.*",
+            '🔒'
+        );
     }
 
 }
