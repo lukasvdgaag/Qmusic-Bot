@@ -15,6 +15,10 @@ class HetGeluid {
      */
     #currentSignupMoment;
     /**
+     * @type {number}
+     */
+    #lastSignUpMomentId;
+    /**
      * @type {boolean}
      */
     available;
@@ -32,28 +36,22 @@ class HetGeluid {
         if (!this.available) return;
 
         await this.getCurrentSignUpMoment();
-        await this.registerAutoSignUpInterval();
-    }
 
-    async registerAutoSignUpInterval() {
-        if (!this.available) return;
+        // set interval to check if users need to be resubscribed. Check every 5 minutes if the sign-up moment didn't change
+        setInterval(async () => {
+            const moment = await this.getCurrentSignUpMoment();
+            if (!moment) return;
 
-        const signUpMoment = await this.getCurrentSignUpMoment();
-        if (!signUpMoment) return;
+            if (this.#lastSignUpMomentId !== moment.id) {
+                this.#lastSignUpMomentId = moment.id;
 
-        // Automatically subscribe all users 5 minutes after the new sign-up moment is available
-        const interval = signUpMoment.hiddenAt.getTime() - TimeUtils.getNow() + (1000 * 60 * 5);
-
-        setTimeout(async () => {
-            await Promise.all(
-                [...this.#discordBot.authBank.getUsers()]
-                    .filter(a => a.settings.het_geluid.auto_signup)
-                    .map(a => this.subscribeUser(a.username))
-            );
-
-            await this.getCurrentSignUpMoment();
-            await this.registerAutoSignUpInterval();
-        }, interval);
+                await Promise.all(
+                    [...this.#discordBot.authBank.getUsers()]
+                        .filter(a => a.settings.het_geluid.auto_signup)
+                        .map(a => this.subscribeUser(a.username))
+                );
+            }
+        }, 1000 * 60 * 5);
     }
 
     /**
@@ -142,7 +140,7 @@ class HetGeluid {
      */
     async subscribeUser(username) {
         const account = this.#discordBot.authBank.getUser(username);
-        if (!account) return false;
+        if (!account || !account.token) return false;
 
         try {
             const signUpMoment = await this.getCurrentSignUpMoment();
@@ -158,7 +156,10 @@ class HetGeluid {
                 }
             });
 
-            if (response.status === 200 || response.status === 201) return signUpMoment;
+            if (response.status === 200 || response.status === 201) {
+                await this.#discordBot.sendMessage(`\`${username}\` is aangemeld voor het geluid van <t:${signUpMoment.hiddenAt.toLocaleString('nl-NL', {timeZone: 'Europe/Amsterdam'})}:D>`);
+                return signUpMoment;
+            }
             return false;
         } catch (e) {
             return false;
