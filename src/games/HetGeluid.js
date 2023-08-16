@@ -39,19 +39,23 @@ class HetGeluid {
 
         // set interval to check if users need to be resubscribed. Check every 5 minutes if the sign-up moment didn't change
         setInterval(async () => {
-            const moment = await this.getCurrentSignUpMoment();
-            if (!moment) return;
-
-            if (this.#lastSignUpMomentId !== moment.id) {
-                this.#lastSignUpMomentId = moment.id;
-
-                await Promise.all(
-                    [...this.#discordBot.authBank.getUsers()]
-                        .filter(a => a.settings.het_geluid.auto_signup)
-                        .map(a => this.subscribeUser(a.username))
-                );
-            }
+            await this.#checkSignUpMoment();
         }, 1000 * 60 * 5);
+    }
+
+    async #checkSignUpMoment() {
+        const moment = await this.getCurrentSignUpMoment();
+        if (!moment) return;
+
+        if (this.#lastSignUpMomentId !== moment.id) {
+            this.#lastSignUpMomentId = moment.id;
+
+            await Promise.all(
+                [...this.#discordBot.authBank.getUsers()]
+                    .filter(a => a.settings.het_geluid.auto_signup)
+                    .map(a => this.subscribeUser(a.username, true))
+            );
+        }
     }
 
     /**
@@ -138,14 +142,14 @@ class HetGeluid {
      * @param username
      * @returns {Promise<SignUpMoment|false>}
      */
-    async subscribeUser(username) {
+    async subscribeUser(username, sendMessage = false) {
         const account = this.#discordBot.authBank.getUser(username);
         if (!account || !account.token) return false;
 
         try {
             const signUpMoment = await this.getCurrentSignUpMoment();
 
-            if (!await this.hasUserSubscribed(username, signUpMoment)) return false;
+            if (await this.hasUserSubscribed(username, signUpMoment)) return false;
 
             const response = await axios.post(`https://api.qmusic.nl/2.9/app/sign_up_moments/${signUpMoment.id}/sign_up`, {
                 code: "geluid"
@@ -157,7 +161,7 @@ class HetGeluid {
             });
 
             if (response.status === 200 || response.status === 201) {
-                await this.#discordBot.sendMessage(`\`${username}\` is aangemeld voor het geluid van <t:${signUpMoment.hiddenAt.toLocaleString('nl-NL', {timeZone: 'Europe/Amsterdam'})}:D>`);
+                if (sendMessage) await this.#discordBot.sendMessage(`\`${username}\` is aangemeld voor het geluid van <t:${signUpMoment.hiddenAt.getTime() / 1000}:D>`);
                 return signUpMoment;
             }
             return false;

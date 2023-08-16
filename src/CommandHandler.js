@@ -558,6 +558,7 @@ class CommandHandler {
         }
 
         currentSignupMoment = await this.discordBot.hetGeluid.subscribeUser(user.username);
+        console.log(currentSignupMoment)
         if (!currentSignupMoment) return await this.#sendHetGeluidSoundUnavailable(interaction);
 
         await this.#sendEmbedMessage(
