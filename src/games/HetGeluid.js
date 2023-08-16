@@ -35,7 +35,7 @@ class HetGeluid {
 
         if (!this.available) return;
 
-        await this.getCurrentSignUpMoment();
+        this.#checkSignUpMoment().catch(console.error);
 
         // set interval to check if users need to be resubscribed. Check every 5 minutes if the sign-up moment didn't change
         setInterval(async () => {
