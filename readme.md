@@ -28,7 +28,11 @@ You can install Node.js [here](https://nodejs.org/en/download/).
 
 After installing Node.js, you can install the bot by running the following command in the root directory of the bot:
 
+```shell
+yarn
 ```
+or using npm:
+```shell
 npm install
 ```
 
