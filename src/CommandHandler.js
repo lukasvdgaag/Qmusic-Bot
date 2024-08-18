@@ -509,7 +509,7 @@ class CommandHandler {
             .setTitle("🔊 Het Geluid")
             .addFields(
                 {name: 'Value', value: `€ ${new Intl.NumberFormat('nl-NL').format(soundInfo.amount)}`, inline: true},
-                {name: 'Audio Name', value: `\`${audioName.replace('.mp3', '')}\``, inline: true}
+                {name: 'Audio Name', value: audioName ? `\`${audioName.replace('.mp3', '')}\`` : '❌ Not available', inline: true}
             )
             .setColor(process.env.MAIN_COLOR)
             .setFooter({
@@ -525,14 +525,14 @@ class CommandHandler {
 
         await interaction.reply({
             embeds: [embed],
-            components: [
+            components: soundInfo.audio ? [
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
                         .setURL(soundInfo.audio)
                         .setStyle(ButtonStyle.Link)
                         .setLabel('Listen to the sound!')
                 )
-            ]
+            ] : []
         });
     }
 
