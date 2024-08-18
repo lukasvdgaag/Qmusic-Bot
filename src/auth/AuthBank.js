@@ -16,6 +16,9 @@ class AuthBank {
     }
 
     async loadUsers() {
+        await fs.access(this.filepath).catch(() =>
+            fs.writeFile(this.filepath, '{}', 'utf8')
+        );
         const data = await fs.readFile(this.filepath, 'utf8');
         const jsonUsers = JSON.parse(data);
 

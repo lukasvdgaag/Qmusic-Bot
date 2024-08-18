@@ -5,7 +5,7 @@ class HetGeluidInformation {
      */
     amount;
     /**
-     * @type {string}
+     * @type {string|null}
      */
     audio;
 
@@ -25,10 +25,10 @@ class HetGeluidInformation {
 
     /**
      * Get the name of the audio file
-     * @returns {string}
+     * @returns {string|null}
      */
     getAudioName() {
-        return this.audio.split('/').pop();
+        return !this.audio ? null : this.audio.split('/').pop();
     }
 
 }

@@ -2,7 +2,7 @@ const AuthBank = require("./auth/AuthBank");
 const path = require("path");
 const DiscordBot = require("./DiscordBot");
 const {getNowDate} = require("./utils/TimeUtils");
-const envLoc = path.join(__dirname, '.env');
+const envLoc = __dirname.endsWith("src") ? path.resolve(__dirname, "../.env") : path.resolve(__dirname, ".env");
 
 require('dotenv').config({path: envLoc});
 (async () => {
