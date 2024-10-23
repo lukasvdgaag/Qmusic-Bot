@@ -1,4 +1,6 @@
-const axios = require("axios");
+import axios, {AxiosResponse} from "axios";
+import {DiscordBot} from "./DiscordBot";
+import {Account} from "./auth/Account";
 
 /**
  * Messages class to send and receive messages from the Qmusic API.
@@ -8,25 +10,22 @@ const axios = require("axios");
  * @version 1.0.0
  * @since 1.1.0
  */
-class QMessagesManager {
+export class QMessagesManager {
 
-    /**
-     * @type {DiscordBot}
-     */
-    #discordBot;
+    private discordBot: DiscordBot;
 
-    constructor(discordBot) {
-        this.#discordBot = discordBot;
+    constructor(discordBot: DiscordBot) {
+        this.discordBot = discordBot;
     }
 
     /**
      * Get the latest messages for a given user.
-     * @param {string} username User login information to use for the request.
-     * @param {number} limit The maximum amount of messages to retrieve.
+     * @param username User login information to use for the request.
+     * @param limit The maximum amount of messages to retrieve.
      * @returns {Promise<void>}
      */
-    async getLatestMessages(username, limit = 50) {
-        const user = await this.#discordBot.authBank.getUser(username);
+    async getLatestMessages(username: string, limit: number = 50) {
+        const user = this.discordBot.authBank.getUser(username);
         if (!user || user.token) return null;
 
         try {
@@ -46,11 +45,11 @@ class QMessagesManager {
 
     /**
      * Send a message to the Qmusic API as a given user.
-     * @param {Account} user User login information to use for the request.
-     * @param {string} message The message to send.
-     * @returns {Promise<axios.AxiosResponse>}
+     * @param user User login information to use for the request.
+     * @param message The message to send.
+     * @returns The request's response or null if the request failed.
      */
-    async sendMessage(user, message) {
+    async sendMessage(user: Account, message: string): Promise<AxiosResponse | null> {
         if (!user || !user.token) return null;
 
         try {
@@ -70,5 +69,3 @@ class QMessagesManager {
     }
 
 }
-
-module.exports = QMessagesManager;

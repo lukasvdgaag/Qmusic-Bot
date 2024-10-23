@@ -1,20 +1,16 @@
-const WebSocketClient = require('websocket').client;
-const {EmbedBuilder} = require("discord.js");
-const SongInfo = require("./radio/SongInfo");
+import {client} from 'websocket';
+import {EmbedBuilder} from "discord.js";
+import {DiscordBot} from "./DiscordBot";
+import {getSongInfoFromJson, SongInfo} from "./radio/SongInfo";
 
-class SocketListener {
+export class SocketListener {
 
-    /**
-     * @type {DiscordBot}
-     */
-    #discordBot;
-    /**
-     * A map of the station id and the song that is currently playing.
-     * @type {Map<string, SongInfo>}
-     */
-    playingNow;
+    #discordBot: DiscordBot;
+    playingNow: Map<string, SongInfo>;
+    messages: string[];
+    client: client;
 
-    constructor(discordBot) {
+    constructor(discordBot: DiscordBot) {
         this.#discordBot = discordBot;
         this.playingNow = new Map();
         this.messages = [
@@ -28,12 +24,12 @@ class SocketListener {
             `["{\\"action\\":\\"join\\",\\"id\\":10,\\"sub\\":{\\"station\\":\\"qmusic_limburg\\",\\"entity\\":\\"plays\\",\\"action\\":\\"play\\"},\\"backlog\\":1}"]`
         ]
 
+        this.client = new client();
         this.init();
     }
 
-    init() {
+    init = () => {
         this.playingNow.clear();
-        this.client = new WebSocketClient();
 
         this.client.on('connectFailed', (e) => {
             console.log('Connect Error: ' + e.toString());
@@ -73,12 +69,13 @@ class SocketListener {
                     if (input === 'o' || input === 'h') return;
 
                     try {
-                        const songInfo = SongInfo.fromJson(input);
+                        const songInfo = getSongInfoFromJson(input);
                         if (!songInfo) return;
 
                         this.playingNow.set(songInfo.station, songInfo);
 
-                        this.#discordBot.radioListener.changeSong(songInfo).catch(() => {});
+                        this.#discordBot.radioListener.changeSong(songInfo).catch(() => {
+                        });
 
                         if (songInfo.station === 'qmusic_nl') {
                             // Check if the song needs to be caught
@@ -86,23 +83,12 @@ class SocketListener {
                             this.#discordBot.catchTheArtist.checkForCatch(songInfo).catch(console.log);
                         }
                     } catch (e) {
-                        //
                         console.log(e)
                     }
-
                 }
             });
         });
 
         this.client.connect('wss://socket.qmusic.nl/api/465/shxy8lro/websocket');
     }
-
-    escapeMessage(input) {
-        input = input.replace(/\\\\\\"/g, '\\\\"');
-        input = input.replace(/\\"/g, '"');
-        return input;
-    }
-
 }
-
-module.exports = SocketListener;

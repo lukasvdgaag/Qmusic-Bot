@@ -92,7 +92,7 @@ npm start
 You can also run the bot using NodeJS directly:
 
 ```
-node index.js
+node index.ts
 ```
 
 ## Qmusic API Reference

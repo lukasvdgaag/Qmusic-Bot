@@ -1,29 +1,22 @@
-const axios = require('axios');
-const SummerHitInfo = require("./objects/SummerHitInfo");
-const {EmbedBuilder} = require("discord.js");
-const {getNowDate, getNow} = require("../utils/TimeUtils");
+import axios, {AxiosResponse} from 'axios';
+import {SummerHitInfo} from "./objects/SummerHitInfo";
+import {ColorResolvable, EmbedBuilder} from "discord.js";
+import {getNow, isNextDay} from "../helpers/TimeHelper";
+import {DiscordBot} from "../DiscordBot";
+import {SummerHitHighscores} from "./objects/SummerHitHighscores";
+import {SummerHitContestant} from "./objects/SummerHitContestant";
 
-class CatchTheSummerHit {
+export class CatchTheSummerHit {
 
-    /**
-     * @type {DiscordBot}
-     */
-    #discordBot;
+    available: boolean = false;
+    songCatchers: Map<string, SummerHitInfo> = new Map();
+    trackOfTheDay?: SummerHitInfo;
+    trackOfTheDayLastUpdated?: number;
 
-    /**
-     * @type {boolean}
-     */
-    available;
+    private discordBot: DiscordBot;
 
-    constructor(discordBot) {
-        this.#discordBot = discordBot;
-        /**
-         * @type {Map<string, SummerHitInfo>}
-         */
-        this.songsCatchers = new Map();
-
-        this.trackOfTheDay = null;
-        this.trackOfTheDayLastUpdated = null;
+    constructor(discordBot: DiscordBot) {
+        this.discordBot = discordBot;
 
         this.#init().catch(console.error);
     }
@@ -49,18 +42,18 @@ class CatchTheSummerHit {
             if (response.status !== 200) return false;
 
             // check if json body contains "game" and if game.currentState === 'ended' or the game.endDate is in the past
-            return response.data?.game?.currentState !== 'ended' && new Date(response.data?.game?.endsAt) > Date.now();
+            return response.data?.game?.currentState !== 'ended' && new Date(response.data?.game?.endsAt).getTime() > Date.now();
         } catch (e) {
             return false;
         }
     }
 
-    async checkForNewDay(force = false) {
+    checkForNewDay = async (force = false) => {
         if (!this.available) {
             const lastUpdated = this.trackOfTheDayLastUpdated;
-            const isNextDay = this.#isNextDay(lastUpdated ? new Date(lastUpdated) : null);
+            const nextDay = isNextDay(lastUpdated ? new Date(lastUpdated) : undefined);
 
-            if (isNextDay) {
+            if (nextDay) {
                 this.available = await this.#isGameAvailable();
                 force = this.available;
                 if (!this.available) return;
@@ -70,25 +63,16 @@ class CatchTheSummerHit {
         }
 
         const trackOfTheDayWasNull = this.trackOfTheDay == null;
-        const isNextDay = this.#isNextDay(this.trackOfTheDay ? new Date(this.trackOfTheDay?.date) : null);
+        const nextDate = isNextDay(this.trackOfTheDay?.date ? new Date(this.trackOfTheDay?.date) : undefined);
 
-        if (force || trackOfTheDayWasNull || isNextDay) {
+        if (force || trackOfTheDayWasNull || nextDate) {
             await this.loadTrackOfTheDay();
             await this.initContestantsTracks();
         }
     }
 
-    #isNextDay(date) {
-        if (!date) return true;
-        const today = getNowDate();
-
-        return today.getFullYear() !== date.getFullYear() ||
-        today.getMonth() !== date.getMonth() ||
-        today.getDate() !== date.getDate();
-    }
-
-    removeUser(username) {
-        this.songsCatchers.forEach((value) => {
+    removeUser(username: string) {
+        this.songCatchers.forEach((value) => {
             value.removeUser(username);
         });
     }
@@ -100,8 +84,8 @@ class CatchTheSummerHit {
             const response = await axios.get('https://api.qmusic.nl/2.4/cth/games/17/track_of_the_day');
 
             if (response.status !== 200) {
-                this.trackOfTheDay = null;
-                this.trackOfTheDayLastUpdated = null;
+                this.trackOfTheDay = undefined;
+                this.trackOfTheDayLastUpdated = undefined;
                 return;
             }
 
@@ -109,11 +93,11 @@ class CatchTheSummerHit {
             this.trackOfTheDayLastUpdated = getNow();
             if (this.trackOfTheDay) this.trackOfTheDay.date = getNow();
 
-            let embed = this.#discordBot.commandHandler.getTrackOfTheDayEmbed(this.trackOfTheDay);
-            await this.#discordBot.sendMessage({embeds: [embed]})
+            let embed = this.discordBot.commandHandler!.getTrackOfTheDayEmbed(this.trackOfTheDay);
+            await this.discordBot.sendMessage({embeds: [embed]});
         } catch (e) {
-            this.trackOfTheDay = null;
-            this.trackOfTheDayLastUpdated = null;
+            this.trackOfTheDay = undefined;
+            this.trackOfTheDayLastUpdated = undefined;
         }
     }
 
@@ -121,11 +105,11 @@ class CatchTheSummerHit {
         if (!this.available) return;
 
         let trackOfTheDayTitle = this.trackOfTheDay?.track_title.toUpperCase();
-        const users = this.#discordBot.authBank.getUsers();
+        const users = this.discordBot.authBank.getUsers();
 
         // Preparing the song catchers map
-        this.songsCatchers.clear();
-        if (trackOfTheDayTitle) this.songsCatchers.set(trackOfTheDayTitle, new SummerHitInfo(this.trackOfTheDay));
+        this.songCatchers.clear();
+        if (trackOfTheDayTitle && this.trackOfTheDay) this.songCatchers.set(trackOfTheDayTitle, this.trackOfTheDay);
 
         // Add the users to the song catchers map
         for (const account of users) {
@@ -133,12 +117,12 @@ class CatchTheSummerHit {
         }
     }
 
-    async initContestantTracks(username) {
+    async initContestantTracks(username: string) {
         if (!this.available) return;
 
-        const account = this.#discordBot.authBank.getUser(username);
+        const account = this.discordBot.authBank.getUser(username);
         // If the user has not enabled the game, skip them.
-        if (!account.settings.catch_the_summer_hit.enabled) return;
+        if (!account?.settings.catch_the_summer_hit.enabled) return;
 
         const contestantInfo = await this.getContestantInfo(username);
         // If the user has no tracks or if they have not yet entered the game on their app, skip them.
@@ -151,23 +135,23 @@ class CatchTheSummerHit {
 
         // Add the user to the global song
         if (this.trackOfTheDay) {
-            let globalHit = this.songsCatchers.get(this.trackOfTheDay.track_title.toUpperCase());
+            let globalHit = this.songCatchers.get(this.trackOfTheDay.track_title.toUpperCase());
             globalHit?.addUser(username);
         }
 
         // Adding all the users' personal songs to the catchers map
         for (const track of tracks) {
-            if (!this.songsCatchers.has(track.track_title.toUpperCase())) {
-                this.songsCatchers.set(track.track_title.toUpperCase(), new SummerHitInfo(track));
+            if (!this.songCatchers.has(track.track_title.toUpperCase())) {
+                this.songCatchers.set(track.track_title.toUpperCase(), new SummerHitInfo(track));
             }
-            this.songsCatchers.get(track.track_title.toUpperCase()).addUser(username);
+            this.songCatchers.get(track.track_title.toUpperCase())?.addUser(username);
         }
     }
 
-    async getContestantInfo(username) {
+    async getContestantInfo(username: string): Promise<SummerHitContestant | undefined> {
         if (!this.available) return undefined;
 
-        const user = this.#discordBot.authBank.getUser(username);
+        const user = this.discordBot.authBank.getUser(username);
         if (!user) return undefined;
 
         try {
@@ -177,16 +161,16 @@ class CatchTheSummerHit {
                 }
             });
 
-            return data.contestant;
+            return data.contestant as SummerHitContestant;
         } catch (e) {
             return undefined;
         }
     }
 
-    async catchSongForUser(username, trackId) {
+    async catchSongForUser(username: string, trackId: string) {
         if (!this.available) return undefined;
 
-        const user = this.#discordBot.authBank.getUser(username);
+        const user = this.discordBot.authBank.getUser(username);
         if (!user) return;
 
         try {
@@ -200,14 +184,16 @@ class CatchTheSummerHit {
         }
     }
 
-    async getHighscoresForUser(username, limit = 10, returnRaw = false) {
+    async getHighscoresForUser(username: string, limit: number): Promise<SummerHitHighscores | undefined>;
+    async getHighscoresForUser(username: string, limit: number, returnRaw: true): Promise<AxiosResponse<{highscores: SummerHitHighscores}> | undefined>;
+    async getHighscoresForUser(username: string, limit: number, returnRaw: boolean = false): Promise<SummerHitHighscores | AxiosResponse<{highscores: SummerHitHighscores}> | undefined> {
         if (!this.available) return undefined;
 
-        const user = this.#discordBot.authBank.getUser(username);
+        const user = this.discordBot.authBank.getUser(username);
         if (!user) return undefined;
 
         try {
-            const response = axios.get(`https://api.qmusic.nl/2.4/cth/games/17/highscores`, {
+            const response = await axios.get(`https://api.qmusic.nl/2.4/cth/games/17/highscores`, {
                 params: {
                     limit
                 },
@@ -215,24 +201,26 @@ class CatchTheSummerHit {
                     'Authorization': `Bearer ${user.token}`
                 }
             });
+
             if (returnRaw) return response;
 
-            const {data} = await response;
-            return data.highscores;
+            const {data} = response;
+            return data.highscores as SummerHitHighscores;
         } catch (e) {
             return undefined;
         }
     }
 
-    async checkForCatches(songTitle, artistName) {
+    async checkForCatches(songTitle: string, artistName: string) {
         if (!this.available) return;
 
-        if (!this.songsCatchers.has(songTitle.toUpperCase())) {
+        if (!this.songCatchers.has(songTitle.toUpperCase())) {
             return [];
         }
 
         // Check if the artist AND the song title match
-        let songInfo = this.songsCatchers.get(songTitle.toUpperCase());
+        let songInfo = this.songCatchers.get(songTitle.toUpperCase());
+        if (!songInfo) return [];
         // if (!songInfo.artist_name.includes(artistName) && !artistName.includes(songInfo.artist_name)) {
         //     return [];
         // }
@@ -240,18 +228,20 @@ class CatchTheSummerHit {
         const songUsers = songInfo.getUsers();
         const promises = []
 
-        const isNight = this.#discordBot.isNightTime();
+        const isNight = this.discordBot.isNightTime();
 
         // catch the song for every user in the songUsers list
         // but randomly over a course of 5 - 15 seconds after the song has been played
         for (const username of songUsers) {
-            const user = this.#discordBot.authBank.getUser(username);
+            const user = this.discordBot.authBank.getUser(username);
+
             // If the user has not enabled the game or if they disabled it during night time, skip them.
+            if (!user) continue;
             if (!user.settings.catch_the_summer_hit.enabled) continue;
             if (!user.settings.catch_the_summer_hit.catch_at_night && isNight) continue;
 
             const delay = Math.random() * 1000 * 10 + 5000;
-            promises.push(new Promise((resolve) => {
+            promises.push(new Promise<AxiosResponse | undefined>((resolve) => {
                 setTimeout(async () => {
                     try {
                         const res = await this.catchSongForUser(username, songInfo.track_id);
@@ -288,13 +278,13 @@ class CatchTheSummerHit {
      * @param {string[]} users
      * @returns {Promise<void>}
      */
-    async sendCatchResults(songInfo, users) {
+    async sendCatchResults(songInfo: SummerHitInfo, users: string[]): Promise<void> {
         // check if anyone wants to be notified.
         if (users.length === 0) return;
 
         const mentionUsers = new Set();
         for (const username of users) {
-            let user = this.#discordBot.authBank.getUser(username);
+            let user = this.discordBot.authBank.getUser(username);
 
             if (user && user.settings.catch_the_summer_hit.notify) {
                 const discord = user?.discord_id;
@@ -311,12 +301,12 @@ class CatchTheSummerHit {
                 {name: 'Caught for', value: users.join(', ')}
             )
             .setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480${songInfo.track_thumbnail}`)
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(process.env.MAIN_COLOR as ColorResolvable)
             .setFooter({
                 text: 'Summer Hit Catcher for Qmusic',
             })
 
-        await this.#discordBot.sendMessage({
+        await this.discordBot.sendMessage({
             content: mentionUsers.size === 0 ? 'I caught a summer hit!' : `I caught a summer hit for ${Array.from(mentionUsers).join(' ')}`,
             embeds: [embed]
         })
@@ -324,5 +314,3 @@ class CatchTheSummerHit {
     }
 
 }
-
-module.exports = CatchTheSummerHit;

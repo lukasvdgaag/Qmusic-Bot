@@ -1,18 +1,38 @@
-const {
-    Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction,
-    SlashCommandUserOption, MessagePayload, SlashCommandBooleanOption, Attachment
-} = require("discord.js");
-const CommandHandler = require("./CommandHandler");
-const CatchTheSummerHit = require("./games/CatchTheSummerHit");
-const SocketListener = require("./SocketListener");
-const CatchTheArtist = require("./games/CatchTheArtist");
-const RadioListener = require("./radio/RadioListener");
-const {getNowDate} = require("./utils/TimeUtils");
-const HetGeluid = require("./games/HetGeluid");
+import {
+    Client,
+    CommandInteraction,
+    GatewayIntentBits,
+    Interaction,
+    MessagePayload,
+    SlashCommandBooleanOption,
+    SlashCommandBuilder,
+    SlashCommandIntegerOption,
+    SlashCommandStringOption,
+    SlashCommandSubcommandBuilder,
+    SlashCommandUserOption,
+    CommandInteractionOptionResolver, ChatInputCommandInteraction, TextBasedChannel, MessageCreateOptions
+} from "discord.js";
+import {CommandHandler} from "./CommandHandler";
+import {CatchTheSummerHit} from "./games/CatchTheSummerHit";
+import {SocketListener} from "./SocketListener";
+import {CatchTheArtist} from "./games/CatchTheArtist";
+import {RadioListener} from "./radio/RadioListener";
+import {getNowDate} from "./helpers/TimeHelper";
+import {HetGeluid} from "./games/HetGeluid";
+import {AuthBank} from "./auth/AuthBank";
 
-class DiscordBot {
+export class DiscordBot {
 
-    constructor(authBank) {
+    authBank: AuthBank;
+    client: Client;
+    radioListener: RadioListener;
+    catchTheArtist: CatchTheArtist;
+    socket?: SocketListener;
+    hetGeluid?: HetGeluid;
+    commandHandler?: CommandHandler;
+    catchTheSummerHit?: CatchTheSummerHit;
+
+    constructor(authBank: AuthBank) {
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -42,7 +62,7 @@ class DiscordBot {
             this.hetGeluid = new HetGeluid(this);
             this.socket = new SocketListener(this);
 
-            console.log(`Bot is ready. Logged in as ${this.client.user.tag}`);
+            console.log(`Bot is ready. Logged in as ${this.client.user?.tag}`);
         });
 
         this.client.on('interactionCreate', async interaction => {
@@ -50,6 +70,8 @@ class DiscordBot {
         });
 
         this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            if (!this.client?.user) return;
+
             const botId = this.client.user.id;
 
             const oldChannel = oldState.channel;
@@ -62,11 +84,11 @@ class DiscordBot {
                 return;
             }
 
-            if (newState.member.id !== botId) return;
+            if (newState.member?.id !== botId) return;
 
             // bot got disconnected / kicked
             if (oldChannel && !newChannel && this.radioListener.activeChannel) {
-                this.radioListener.stop();
+                await this.radioListener.stop();
                 await this.sendMessage("I got kicked from the channel. Stopping the radio.");
                 return;
             }
@@ -81,6 +103,10 @@ class DiscordBot {
     }
 
     #initCommands() {
+        if (!this.client?.application) {
+            return;
+        }
+
         /*
         /summerhit about
         /summerhit trackoftheday
@@ -276,8 +302,8 @@ class DiscordBot {
         this.client.application.commands.set(commands).catch(console.error);
     }
 
-    async #handleInteraction(interaction) {
-        if (interaction instanceof CommandInteraction) {
+    async #handleInteraction(interaction: Interaction) {
+        if (interaction instanceof ChatInputCommandInteraction) {
             if (interaction.commandName === 'qmusic') {
                 const subCommand = interaction.options.getSubcommand(false);
 
@@ -356,8 +382,16 @@ class DiscordBot {
      * @param {string} channelId The ID of the channel to send the message to
      * @returns {Promise<Message<true>>}
      */
-    async sendMessage(message, channelId = process.env.DISCORD_CHANNEL_ID) {
+    async sendMessage(message: string|MessagePayload|MessageCreateOptions, channelId = process.env.DISCORD_CHANNEL_ID) {
+        if (!channelId) {
+            console.error(`Couldn't send message: No channel ID provided`);
+            return;
+        }
         const channel = this.client.channels.cache.get(channelId) ?? await this.client.channels.fetch(channelId);
+        if (!channel || !channel.isTextBased()) {
+            console.error(`Couldn't send message: Channel with ID ${channelId} not found`);
+            return;
+        }
 
         return await channel.send(message);
     }
@@ -369,5 +403,3 @@ class DiscordBot {
     }
 
 }
-
-module.exports = DiscordBot;

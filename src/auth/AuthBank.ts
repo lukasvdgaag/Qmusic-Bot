@@ -1,18 +1,19 @@
-const path = require("path");
-const fs = require("fs").promises;
-const jwt = require("jsonwebtoken");
-const Account = require("./Account");
-const Authenticator = require("./Authenticator");
-const {getNow} = require("../utils/TimeUtils");
+import path from "path";
+import jwt from "jsonwebtoken";
+import {promises as fs} from "fs";
+import {Account} from "./Account";
+import {Authenticator} from "./Authenticator";
+import {getNow} from "../helpers/TimeHelper";
+import {AccountSettings} from "./AccountSettings";
 
-class AuthBank {
+export class AuthBank {
+
+    filepath: string;
+    users: Map<string, Account>;
 
     constructor() {
         this.filepath = path.resolve(__dirname, "../tokens.json");
-        /**
-         * @type {Map<string, Account>}
-         */
-        this.users = new Map();
+        this.users = new Map<string, Account>();
     }
 
     async loadUsers() {
@@ -23,10 +24,7 @@ class AuthBank {
         const jsonUsers = JSON.parse(data);
 
         this.users.clear();
-
-        for (const user of Object.values(jsonUsers)) {
-            this.loadUser(user);
-        }
+        Object.values(jsonUsers).forEach(account => this.loadUser(account as Account));
     }
 
     /**
@@ -35,15 +33,16 @@ class AuthBank {
      * @param password Password of the account
      * @param discord_id Discord ID of the user
      * @param save Whether to save the changes to the file
-     * @returns {Promise<Account|boolean>} The created account or false if the user already exists
+     * @returns The created account or false if the user already exists
      */
-    async addUser(username, password, discord_id = null, save = false) {
+    addUser = async (username: string, password: string, discord_id: string | undefined = undefined, save: boolean = false): Promise<Account | boolean> => {
         if (this.getUser(username)) return false;
 
-        const userData = {
+        const userData: Account = {
             username,
             password,
             discord_id,
+            settings: new AccountSettings(),
         }
 
         const addedUser = this.loadUser(userData);
@@ -51,7 +50,7 @@ class AuthBank {
         return addedUser;
     }
 
-    async removeUser(username) {
+    removeUser = async (username: string): Promise<boolean> => {
         if (!this.getUser(username)) return false;
 
         this.users.delete(username);
@@ -60,29 +59,16 @@ class AuthBank {
         return true;
     }
 
-    /**
-     * @param jsonUser
-     * @returns {Account}
-     */
-    loadUser(jsonUser) {
-        let account = new Account(jsonUser);
-        this.users.set(jsonUser.username, account);
-        return account;
+    loadUser = (jsonUser: Account): Account => {
+        this.users.set(jsonUser.username, jsonUser);
+        return jsonUser;
     }
 
-    /**
-     * @param username
-     * @returns {Account}
-     */
-    getUser(username) {
+    getUser = (username: string): Account | undefined => {
         return this.users.get(username);
     }
 
-    /**
-     * Get all users
-     * @returns {IterableIterator<Account>}
-     */
-    getUsers() {
+    getUsers = (): IterableIterator<Account> => {
         return this.users.values();
     }
 
@@ -91,15 +77,15 @@ class AuthBank {
      * @param {string} discordId
      * @returns {Account|null}
      */
-    getUserByDiscordId(discordId) {
+    getUserByDiscordId = (discordId: string): Account | undefined => {
         for (const user of this.users.values()) {
             if (user.discord_id === discordId) return user;
         }
-        return null;
+        return undefined;
     }
 
-    async saveUsers() {
-        const json = {};
+    saveUsers = async () => {
+        const json: { [key: string]: Account } = {};
 
         for (const user of this.users.values()) {
             json[user.username] = user;
@@ -109,8 +95,8 @@ class AuthBank {
         await fs.writeFile(this.filepath, data, 'utf8');
     }
 
-    isTokenExpired(token) {
-        const exp = this.#getTokenExpirationDate(token);
+    isTokenExpired = (token?: string) => {
+        const exp = this.getTokenExpirationDate(token);
 
         // If there is no expiration date, the token is invalid
         if (!exp) return true;
@@ -120,22 +106,22 @@ class AuthBank {
         return exp < currentTime + 3600;
     }
 
-    #getTokenExpirationDate(token) {
-        const decoded = jwt.decode(token);
-        const exp = decoded && decoded.exp;
+    private getTokenExpirationDate = (token?: string): number | undefined => {
+        if (!token) return undefined;
 
+        const decoded = jwt.decode(token);
         // If there is no expiration date, the token is invalid
-        return exp ?? null;
+        return decoded ? (decoded as any).exp as number : undefined;
     }
 
-    async #generateNewToken(username) {
+    private generateNewToken = async (username: string) => {
         let user = this.getUser(username);
-        if (!user) return null;
+        if (!user) return undefined;
 
         return await new Authenticator().processLogin(user.username, user.password);
     }
 
-    async refreshTokens() {
+    refreshTokens = async () => {
         await this.loadUsers();
         for (const user of this.users.values()) {
             await this.refreshUserToken(user.username, false);
@@ -143,20 +129,20 @@ class AuthBank {
         await this.saveUsers();
     }
 
-    async refreshUserToken(username, save = true, force = false) {
+    refreshUserToken = async (username: string, save: boolean = true, force: boolean = false) => {
         const user = this.getUser(username);
         if (user == null) return;
 
         if (force || !user.token || this.isTokenExpired(user.token)) {
-            user.token = await this.#generateNewToken(user.username);
+            user.token = await this.generateNewToken(user.username);
         }
 
-        user.expires = this.#getTokenExpirationDate(user.token);
+        user.expires = this.getTokenExpirationDate(user.token);
 
         if (save) await this.saveUsers();
 
         const currentTime = Math.floor(getNow() / 1000);
-        const timeToRefresh = Math.max(5, user.expires - currentTime - 3600);
+        const timeToRefresh = Math.max(5, (user.expires ?? 0) - currentTime - 3600);
         console.log(`Next refresh for ${username} in ${timeToRefresh} seconds`);
         setTimeout(async () => {
             await this.refreshUserToken(username, true, true);
@@ -164,5 +150,3 @@ class AuthBank {
     }
 
 }
-
-module.exports = AuthBank;

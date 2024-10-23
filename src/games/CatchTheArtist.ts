@@ -1,22 +1,19 @@
+import {DiscordBot} from "../DiscordBot";
+import {QMessagesManager} from "../QMessagesManager";
+import {Account} from "../auth/Account";
+
 const {EmbedBuilder} = require("discord.js");
-const QMessagesManager = require("../QMessagesManager");
-const {getNowDate} = require("../utils/TimeUtils");
+const {getNowDate} = require("../helpers/TimeHelper");
 
-class CatchTheArtist {
+export class CatchTheArtist {
 
-    /**
-     * @type {DiscordBot}
-     */
-    #discordBot;
-    /**
-     * @type {QMessagesManager}
-     */
-    #messagesManager;
+    private discordBot: DiscordBot;
+    private messagesManager: QMessagesManager;
+    artistCatchers: Map<string, Set<string>>;
 
-    constructor(discordBot) {
-        this.#discordBot = discordBot;
-        this.#messagesManager = new QMessagesManager(discordBot);
-
+    constructor(discordBot: DiscordBot) {
+        this.discordBot = discordBot;
+        this.messagesManager = new QMessagesManager(discordBot);
         this.artistCatchers = new Map();
 
         this.#init();
@@ -27,7 +24,7 @@ class CatchTheArtist {
     }
 
     initContestantsArtists() {
-        const users = this.#discordBot.authBank.getUsers();
+        const users = this.discordBot.authBank.getUsers();
 
         for (const user of users) {
             this.initContestant(user);
@@ -37,7 +34,7 @@ class CatchTheArtist {
     /**
      * @param {Account} user
      */
-    initContestant(user) {
+    initContestant(user: Account) {
         const settings = user.settings.catch_the_artist;
 
         // Check if the game is enabled and if the user has an artist set
@@ -48,7 +45,7 @@ class CatchTheArtist {
             this.artistCatchers.set(artist, new Set());
         }
 
-        this.artistCatchers.get(artist).add(user.username);
+        this.artistCatchers.get(artist)?.add(user.username);
     }
 
     #isNightTime() {
