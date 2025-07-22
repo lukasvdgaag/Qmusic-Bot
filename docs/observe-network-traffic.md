@@ -25,7 +25,7 @@ There are a few ways to observe network traffic using Charles Proxy: your own co
 2. Connect your mobile device to the same Wi-Fi network as your computer.
 3. On your mobile device, go to **Settings** > **Wi-Fi**, tap the "i" next to your network, scroll down to **HTTP Proxy**, and set it to manual with your computer's IP address and port (default is 8888).
 4. Install the Charles Root Certificate on your mobile device: 
-   - Download the mobile certificate from [https://chls.pro/ssl](http://chls.pro/ssl). This should happen automatically.
+   - Download the mobile certificate from [https://chls.pro/ssl](http://chls.pro/ssl). This should happen automatically. If this doesn't work, you can download it from [this page](./assets/charles-proxy-ssl-proxying-certificate.pem).
    - For iOS, go to **Settings** > **General** > **About** > **Certificate Trust Settings** and enable full trust for the Charles Proxy certificate.
    - For Android, go to **Settings** > **Security** > **Install from storage** and select the Charles Proxy certificate.
 
