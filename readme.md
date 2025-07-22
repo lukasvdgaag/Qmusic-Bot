@@ -31,7 +31,9 @@ After installing Node.js, you can install the bot by running the following comma
 ```shell
 yarn
 ```
+
 or using npm:
+
 ```shell
 npm install
 ```
@@ -169,3 +171,13 @@ Below is a complete overview of the authentication process.
 | `https://qmusic.nl/_csrf/?origin=https%3A%2F%2Fqmusic.nl&domain=.qmusic.nl`                                                                                                                                           | GET    | Get the CSRF token that is needed to log in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `https://login.dpgmedia.nl/login?client_id=qmusicnl-web`                                                                                                                                                              | POST   | Login to the DPG Media account. Requires the credentials to be sent as form data (`username` (email) and `password`) with `Content-Type` set to `multipart/form-data`. It is also recommended to use a 'general' `User-Agent` like `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36`. Lastly, the `Referer` header has to be set to `https://login.dpgmedia.nl/login?client_id=qmusicnl-web&email={{ENCODED_EMAIL}}` to mimic the behavior of the website. Here, `{{ENCODED_EMAIL}}` is the Base64-encoded email that was used for the authentication. |
 | `https://login.dpgmedia.nl/authorize/continue/sso?client_id=qmusicnl-web`                                                                                                                                             | GET    | Continue the login process. This will bring us to the callback page where the `radio-auth-token` is set in the local storage. We need this token for our OAuth API verification as this is our Bearer token.                                                                                                                                                                                                                                                                                                                                                                                                           |
+
+## Future Development
+
+QMusic could change their API at any time, which could break some of the bot's functionality.
+
+Did they add a new game or change the API? You can read how to [observe network traffic](docs/observe-network-traffic.md) to find out how the QMusic app is
+using the network and how to adapt the bot to these changes.
+
+*This bot is not affiliated with QMusic or DPG Media in any way. It is a personal project to automate some of the tasks that are required to play the games on
+the QMusic app.*
