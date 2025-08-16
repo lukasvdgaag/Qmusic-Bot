@@ -1,55 +1,49 @@
-const axios = require("axios");
-const StationInfo = require("./StationInfo");
+import axios from "axios";
+import {StationInfo} from "./StationInfo";
+import {AudioPlayer, AudioPlayerStatus, createAudioPlayer, createAudioResource, joinVoiceChannel} from '@discordjs/voice';
+import {APIApplicationCommandOptionChoice, EmbedBuilder, Message, RestOrArray, VoiceBasedChannel} from "discord.js";
+import {DiscordBot} from "../DiscordBot";
+import {SongInfo} from "./SongInfo";
+import {DEFAULT_EMBED_COLOR} from "../constants/constants";
 
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus} = require('@discordjs/voice');
-const {VoiceBasedChannel, EmbedBuilder} = require("discord.js");
+export class RadioListener {
 
-class RadioListener {
+    stations: Map<string, StationInfo>;
+    messageChannelId?: string;
+    lastMessage?: Message;
+    activeStation?: string;
+    activeChannel?: string;
+    player?: AudioPlayer;
+    private discordBot: DiscordBot;
 
-    /**
-     * @type {DiscordBot}
-     */
-    #discordBot;
-
-
-    constructor(discordBot) {
-        /**
-         * @type {Map<string, StationInfo>}
-         */
+    constructor(discordBot: DiscordBot) {
         this.stations = new Map();
-        this.#discordBot = discordBot;
-
-        this.messageChannelId = null;
-        this.lastMessage = null;
-
-        this.activeStation = null;
-        this.activeChannel = null;
-        this.player = null;
+        this.discordBot = discordBot;
     }
 
-    async loadStations() {
+    loadStations = async () => {
         this.stations.clear();
 
         try {
             const url = "https://api.qmusic.nl/2.0/channels";
             const result = await axios.get(url);
 
-            for (const {data} of result.data.data) {
-                const station = new StationInfo(
-                    data.id,
-                    data.name,
-                    data.streams.aac[0].source,
-                    data.logo.app_logo
-                );
-                this.stations.set(station.id, station);
+            for (const {data: {id, name, streams, logo}} of result.data.data) {
+                const station: StationInfo = {
+                    id,
+                    name,
+                    url: streams.aac[0].source,
+                    icon: logo.app_logo
+                };
+                this.stations.set(id, station);
             }
         } catch (e) {
             console.error(e);
         }
     }
 
-    getCommandOptions() {
-        const options = [];
+    getCommandOptions = (): RestOrArray<APIApplicationCommandOptionChoice<string>> => {
+        const options: RestOrArray<APIApplicationCommandOptionChoice<string>> = [];
         for (const station of this.stations.values()) {
             options.push({
                 name: station.name,
@@ -59,15 +53,9 @@ class RadioListener {
         return options;
     }
 
-    /**
-     *
-     * @param {string} stationId
-     * @param {VoiceBasedChannel} voiceChannel
-     * @param {string} messageChannelId
-     * @returns {Promise<void>}
-     */
-    async playStation(stationId, voiceChannel, messageChannelId) {
+    playStation = async (stationId: string, voiceChannel: VoiceBasedChannel, messageChannelId: string) => {
         const station = this.stations.get(stationId);
+        if (!station) return;
 
         this.activeStation = stationId;
         this.messageChannelId = messageChannelId;
@@ -97,8 +85,8 @@ class RadioListener {
             this.player.play(resource);
 
             this.player.on('error', error => {
-                console.error(`Error: ${error.message} with resource ${error.resource.metadata.title}`);
-                this.player.play(createAudioResource(station.url, {
+                console.error(`Error: ${error.message} with resource ${(error.resource.metadata as any).title}`);
+                this.player?.play(createAudioResource(station.url, {
                     inlineVolume: true,
                 }));
             });
@@ -108,14 +96,15 @@ class RadioListener {
             });
         }
 
-        await this.changeSong(this.#discordBot.socket.playingNow.get(stationId));
+        await this.changeSong(this.discordBot.socket?.playingNow.get(stationId));
     }
 
-    async changeSong(songInfo) {
+    changeSong = async (songInfo?: SongInfo) => {
         if (!this.activeChannel || !songInfo || !this.messageChannelId || !this.activeStation || this.activeStation !== songInfo.station) return;
 
         if (this.lastMessage) {
-            this.lastMessage.delete().catch(() => {});
+            this.lastMessage.delete().catch(() => {
+            });
         }
 
         const content = `Now playing: **${songInfo.title}** by ${songInfo.artist}`;
@@ -129,7 +118,7 @@ class RadioListener {
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             })
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         if (songInfo.next) {
             embed.addFields({name: 'Up next', value: `${songInfo.next.title} - ${songInfo.next.artist}`, inline: false})
@@ -138,28 +127,30 @@ class RadioListener {
             embed.addFields({name: 'Listen on Spotify', value: 'https://qmusic.nl/luister/qmusic_nl', inline: false});
         }
 
-        this.lastMessage = await this.#discordBot.sendMessage({content, embeds: [embed]}, this.messageChannelId);
+        this.lastMessage = await this.discordBot.sendMessage(
+            {content, embeds: [embed]},
+            this.messageChannelId
+        );
     }
 
     async stop() {
-        if (this.player) {
-            this.activeChannel = null;
-            this.player.stop(true);
-            this.player = null;
-            this.messageChannelId = null;
-            this.activeStation = null;
-
-            if (this.lastMessage) {
-                this.lastMessage.delete().catch(() => {});
-                this.lastMessage = null;
-            }
-            return true;
+        if (!this.player) {
+            return false;
         }
-        return false;
+
+        this.activeChannel = undefined;
+        this.player.stop(true);
+        this.player = undefined;
+        this.messageChannelId = undefined;
+        this.activeStation = undefined;
+
+        if (this.lastMessage) {
+            this.lastMessage.delete().catch(() => {
+            });
+            this.lastMessage = undefined;
+        }
+        return true;
     }
 
 
-
 }
-
-module.exports = RadioListener;

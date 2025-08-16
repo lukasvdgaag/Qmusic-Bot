@@ -1,18 +1,30 @@
-const {EmbedBuilder, ActionRowBuilder, ButtonBuilder} = require("discord.js");
-const {joinVoiceChannel, createAudioPlayer} = require("@discordjs/voice");
-const {ButtonStyle} = require("discord-api-types/v8");
+import {
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ChatInputCommandInteraction,
+    CommandInteraction,
+    EmbedBuilder,
+    GuildMember,
+    MessageFlags
+} from "discord.js";
+import {DiscordBot} from "./DiscordBot";
+import {SummerHitInfo} from "./games/objects/SummerHitInfo";
+import {SummerHitHighscoreUser} from "./games/objects/SummerHitHighscores";
+import {highlightQueryInAnswer} from "./games/objects/HetGeluidAttempt";
+import {Account} from "./auth/Account";
+import {DEFAULT_EMBED_COLOR} from "./constants/constants";
 
-class CommandHandler {
+export class CommandHandler {
 
-    /**
-     * @param {DiscordBot} discordBot
-     */
-    constructor(discordBot) {
+    private discordBot: DiscordBot;
+
+    constructor(discordBot: DiscordBot) {
         this.discordBot = discordBot;
     }
 
-    async handleSummerHitAboutCommand(interaction) {
-        if (!this.discordBot.catchTheSummerHit.available) {
+    async handleSummerHitAboutCommand(interaction: ChatInputCommandInteraction) {
+        if (!this.discordBot.catchTheSummerHit?.available) {
             await this.#sendGameNotAvailableMessage(interaction)
             return;
         }
@@ -49,13 +61,13 @@ class CommandHandler {
                 text: "Meer informatie: https://qmusic.nl/speel-mee-met-catch-the-summerhit-2023",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             })
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         await interaction.reply({embeds: [embed]});
     }
 
-    async handleSummerHitTrackOfTheDayCommand(interaction) {
-        if (!this.discordBot.catchTheSummerHit.available) {
+    async handleSummerHitTrackOfTheDayCommand(interaction: ChatInputCommandInteraction) {
+        if (!this.discordBot.catchTheSummerHit?.available) {
             await this.#sendGameNotAvailableMessage(interaction)
             return;
         }
@@ -68,8 +80,8 @@ class CommandHandler {
         await interaction.reply({embeds: [embed]});
     }
 
-    async handleSummerHitStatsCommand(interaction) {
-        if (!this.discordBot.catchTheSummerHit.available) {
+    async handleSummerHitStatsCommand(interaction: ChatInputCommandInteraction) {
+        if (!this.discordBot.catchTheSummerHit?.available) {
             await this.#sendGameNotAvailableMessage(interaction)
             return;
         }
@@ -89,13 +101,17 @@ class CommandHandler {
 
         // Checking that if the user just started the game, the songs are initialized
         if (this.discordBot.catchTheSummerHit.trackOfTheDay) {
-            const trackingUsers = this.discordBot.catchTheSummerHit.songsCatchers.get(this.discordBot.catchTheSummerHit.trackOfTheDay.track_title.toUpperCase());
-            if (!trackingUsers.getUsers().includes(user.username)) {
+            const trackingUsers = this.discordBot.catchTheSummerHit.songCatchers.get(this.discordBot.catchTheSummerHit.trackOfTheDay.track_title.toUpperCase());
+            if (!trackingUsers?.getUsers().includes(user.username)) {
                 await this.discordBot.catchTheSummerHit.initContestantTracks(user.username);
             }
         }
 
         const userLeaderboard = await this.discordBot.catchTheSummerHit.getHighscoresForUser(user.username, 2);
+        if (!userLeaderboard) {
+            await this.#sendGameUnavailableMessage(interaction);
+            return;
+        }
 
         let multiplierValue = contestantInfo.multiplier.value;
         let multiplierExpiryDate = new Date(contestantInfo.multiplier.expires_at).getTime() / 1000;
@@ -118,16 +134,16 @@ class CommandHandler {
                 inline: true
             }, {
                 name: 'Your Tracks',
-                value: this.#getPersonalTracksList(user.username, contestantInfo),
+                value: this.getPersonalTracksList(user.username),
                 inline: false
             })
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         await interaction.reply({embeds: [embed]});
     }
 
-    async handleSummerHitLeaderboardCommand(interaction) {
-        if (!this.discordBot.catchTheSummerHit.available) {
+    async handleSummerHitLeaderboardCommand(interaction: ChatInputCommandInteraction) {
+        if (!this.discordBot.catchTheSummerHit?.available) {
             await this.#sendGameNotAvailableMessage(interaction)
             return;
         }
@@ -153,6 +169,10 @@ class CommandHandler {
 
         const count = interaction.options.getInteger('count') || 10;
         const userLeaderboard = await this.discordBot.catchTheSummerHit.getHighscoresForUser(user.username, count);
+        if (!userLeaderboard) {
+            await this.#sendGameUnavailableMessage(interaction);
+            return;
+        }
 
         let userLeaderboardRank = userLeaderboard.me.rank;
 
@@ -172,17 +192,17 @@ class CommandHandler {
                 value: this.#getLeaderboardUsers(userLeaderboard.top),
                 inline: false
             })
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         await interaction.reply({embeds: [embed]});
     }
 
-    async handleSummerHitLeaderboardInternalCommand(interaction) {
+    async handleSummerHitLeaderboardInternalCommand(interaction: CommandInteraction) {
         const users = Array.from(this.discordBot.authBank.getUsers());
 
         const promises = [];
         for (const user of users) {
-            promises.push(this.discordBot.catchTheSummerHit.getHighscoresForUser(user.username, 0, true));
+            promises.push(this.discordBot.catchTheSummerHit?.getHighscoresForUser(user.username, 0, true));
         }
 
         let rankArray = [];
@@ -231,7 +251,7 @@ class CommandHandler {
         const embed = new EmbedBuilder()
             .setTitle("🏝️ Catch The Summer Hit Leaderboard")
             .setDescription(`Internal leaderboard for Catch The Summer Hit.`)
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -244,19 +264,24 @@ class CommandHandler {
         await interaction.reply({embeds: [embed]});
     }
 
-    async handleQmusicAddAccountCommand(interaction) {
+    async handleQmusicAddAccountCommand(interaction: ChatInputCommandInteraction) {
         let userId = interaction.options.getUser('user')?.id ?? interaction.user.id;
 
-        const username = interaction.options.getString('username');
-        const password = interaction.options.getString('password');
+        const username = interaction.options.getString('username')!;
+        const password = interaction.options.getString('password')!;
 
-        let user = this.discordBot.authBank.getUser(username);
-        if (user != null) {
+        let user = this.discordBot.authBank.getUser(username!);
+        if (user) {
             await this.#sendAccountAlreadyLinkedMessage(interaction);
             return;
         }
 
-        user = await this.discordBot.authBank.addUser(username, password, userId, true);
+        const newUser = await this.discordBot.authBank.addUser(username, password, userId, true);
+        if (!newUser || typeof newUser !== 'object') {
+            await this.#sendInvalidCredentialsMessage(interaction);
+            return;
+        }
+        user = newUser;
 
         // Refreshing the token to make sure it's valid
         if (user) await this.discordBot.authBank.refreshUserToken(username, true, true);
@@ -267,49 +292,22 @@ class CommandHandler {
             return;
         }
 
-        await this.discordBot.catchTheSummerHit.initContestantTracks(username);
+        await this.discordBot.catchTheSummerHit?.initContestantTracks(username);
 
         await this.#sendAccountLinkedMessage(interaction, username, userId);
     }
 
-    async handleQmusicRemoveAccountCommand(interaction) {
+    async handleQmusicRemoveAccountCommand(interaction: ChatInputCommandInteraction) {
         const user = await this.#getTargetUser(interaction);
         if (!user) return;
 
-        this.discordBot.catchTheSummerHit.removeUser(user.username);
+        this.discordBot.catchTheSummerHit?.removeUser(user.username);
         await this.discordBot.authBank.removeUser(user.username);
 
         await this.#sendAccountRemovedMessage(interaction, user.username);
     }
 
-    /**
-     * Get the target user for the command.
-     * @param interaction
-     * @returns {Promise<Account|null>}
-     */
-    async #getTargetUser(interaction) {
-        let userId = interaction.user.id;
-
-        const username = interaction.options.getString('username');
-
-        let user;
-        if (username) {
-            user = this.discordBot.authBank.getUser(username);
-            if (user == null) {
-                await this.#sendNoAccountFoundMessage(interaction, username);
-                return null;
-            }
-        } else {
-            user = this.discordBot.authBank.getUserByDiscordId(userId);
-            if (user == null) {
-                await this.#sendUnauthorizedMessage(interaction);
-                return null;
-            }
-        }
-        return user;
-    }
-
-    async handleSummerHitSettingsCommand(interaction) {
+    async handleSummerHitSettingsCommand(interaction: ChatInputCommandInteraction) {
         const userId = interaction.user.id;
 
         const user = this.discordBot.authBank.getUserByDiscordId(userId);
@@ -332,7 +330,7 @@ class CommandHandler {
         if (enable != null || notify != null || catchAtNight != null) {
             await this.discordBot.authBank.saveUsers();
 
-            await this.discordBot.catchTheSummerHit.initContestantTracks(user.username);
+            await this.discordBot.catchTheSummerHit?.initContestantTracks(user.username);
         }
 
         const embed = new EmbedBuilder()
@@ -350,7 +348,7 @@ class CommandHandler {
                     value: settings.catch_at_night ? '✅ We will catch songs at night (between 2 and 6)!' : '❌ We will __not__ catch songs at night (between 2 and 6).',
                     inline: true
                 },
-            ).setColor(process.env.MAIN_COLOR)
+            ).setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -359,8 +357,13 @@ class CommandHandler {
         await interaction.reply({embeds: [embed]});
     }
 
-    async handleQmusicListenCommand(interaction) {
+    async handleQmusicListenCommand(interaction: ChatInputCommandInteraction) {
         // check if user is in a voice channel
+        if (!(interaction.member instanceof GuildMember)) {
+            await this.#sendNotInVoiceChannelMessage(interaction);
+            return;
+        }
+
         const voiceChannel = interaction.member.voice.channel;
 
         if (!voiceChannel) {
@@ -375,7 +378,7 @@ class CommandHandler {
         }
 
         if (this.discordBot.radioListener.player) {
-            this.discordBot.radioListener.stop();
+            await this.discordBot.radioListener.stop();
         }
 
         await this.discordBot.radioListener.playStation(station, voiceChannel, interaction.channelId);
@@ -383,18 +386,18 @@ class CommandHandler {
         await this.#sendListeningMessage(interaction, station);
     }
 
-    async handleQmusicStopCommand(interaction) {
+    async handleQmusicStopCommand(interaction: ChatInputCommandInteraction) {
         if (!this.discordBot.radioListener.player) {
             await this.#sendNotListeningMessage(interaction);
             return;
         }
 
-        this.discordBot.radioListener.stop();
+        await this.discordBot.radioListener.stop();
 
         await this.#sendStoppedListeningMessage(interaction);
     }
 
-    async handleCatchArtistSettingsCommand(interaction) {
+    async handleCatchArtistSettingsCommand(interaction: ChatInputCommandInteraction) {
         const userId = interaction.user.id;
 
         const user = this.discordBot.authBank.getUserByDiscordId(userId);
@@ -421,7 +424,7 @@ class CommandHandler {
         if (enable != null || notify != null || artist != null || sendAppMessage != null || notifyWhenUpcoming != null) {
             await this.discordBot.authBank.saveUsers();
 
-            this.discordBot.catchTheArtist.initContestant(user);
+            this.discordBot.catchTheArtist?.initContestant(user);
         }
 
         const embed = new EmbedBuilder()
@@ -446,7 +449,7 @@ class CommandHandler {
                     inline: true
                 },
             )
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -455,7 +458,7 @@ class CommandHandler {
         await interaction.reply({embeds: [embed]});
     }
 
-    getTrackOfTheDayEmbed(trackOfTheDay) {
+    getTrackOfTheDayEmbed(trackOfTheDay: SummerHitInfo | undefined) {
         const embed = new EmbedBuilder()
             .setTitle("🎺 Track of the Day")
             .addFields({
@@ -470,7 +473,7 @@ class CommandHandler {
                 name: 'Points',
                 value: `+ ${trackOfTheDay?.points ?? 0} points`,
             })
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -479,30 +482,16 @@ class CommandHandler {
         return embed;
     }
 
-    #getPersonalTracksList(username, contestantInfo) {
-        // const tracks = contestantInfo.tracks;
-        const tracks = Array.from(this.discordBot.catchTheSummerHit.songsCatchers.values())
-            .filter(c => c.hasUser(username));
-        let message = '';
-
-        let i;
-        for (i = 0; i < tracks.length; i++) {
-            const track = tracks[i];
-
-            message += `${i + 1}. **${track.track_title} - ${track.artist_name}** (+${track.points} points)`;
-
-            if (i < tracks.length - 1) message += '\n';
-        }
-
-        return message;
-    }
-
-    async handleHetGeluidInfoCommand(interaction) {
-        const soundInfo = await this.discordBot.hetGeluid.fetchSoundInfo();
+    async handleHetGeluidInfoCommand(interaction: ChatInputCommandInteraction) {
+        const soundInfo = await this.discordBot.hetGeluid?.fetchSoundInfo();
 
         if (!soundInfo) return await this.#sendHetGeluidSoundUnavailable(interaction);
 
-        const answers = await this.discordBot.hetGeluid.fetchAnswers();
+        const answers = await this.discordBot.hetGeluid?.fetchAnswers();
+        if (!answers) {
+            console.log('No answers found for Het Geluid');
+            return await this.#sendHetGeluidSoundUnavailable(interaction);
+        }
 
         let audioName = soundInfo.getAudioName();
         const embed = new EmbedBuilder()
@@ -511,7 +500,7 @@ class CommandHandler {
                 {name: 'Value', value: `€ ${new Intl.NumberFormat('nl-NL').format(soundInfo.amount)}`, inline: true},
                 {name: 'Audio Name', value: audioName ? `\`${audioName.replace('.mp3', '')}\`` : '❌ Not available', inline: true}
             )
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -526,7 +515,7 @@ class CommandHandler {
         await interaction.reply({
             embeds: [embed],
             components: soundInfo.audio ? [
-                new ActionRowBuilder().addComponents(
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
                     new ButtonBuilder()
                         .setURL(soundInfo.audio)
                         .setStyle(ButtonStyle.Link)
@@ -536,17 +525,17 @@ class CommandHandler {
         });
     }
 
-    async handleHetGeluidSignupCommand(interaction) {
+    async handleHetGeluidSignupCommand(interaction: ChatInputCommandInteraction) {
         const user = await this.#getTargetUser(interaction);
         if (!user) return;
 
-        let currentSignupMoment = await this.discordBot.hetGeluid.getCurrentSignUpMoment();
+        let currentSignupMoment = await this.discordBot.hetGeluid?.getCurrentSignUpMoment();
         if (!currentSignupMoment) {
             console.log('Het Geluid is not available at the moment');
             return await this.#sendHetGeluidSoundUnavailable(interaction);
         }
 
-        const subscribed = await this.discordBot.hetGeluid.hasUserSubscribed(user.username, currentSignupMoment);
+        const subscribed = await this.discordBot.hetGeluid?.hasUserSubscribed(user.username, currentSignupMoment);
         console.log('subscribed', subscribed)
         if (subscribed) {
             return await this.#sendEmbedMessage(
@@ -557,8 +546,7 @@ class CommandHandler {
             );
         }
 
-        currentSignupMoment = await this.discordBot.hetGeluid.subscribeUser(user.username);
-        console.log(currentSignupMoment)
+        currentSignupMoment = await this.discordBot.hetGeluid?.subscribeUser(user.username);
         if (!currentSignupMoment) return await this.#sendHetGeluidSoundUnavailable(interaction);
 
         await this.#sendEmbedMessage(
@@ -569,10 +557,10 @@ class CommandHandler {
         );
     }
 
-    async handleHetGeluidFindAnswerCommand(interaction) {
-        const answer = interaction.options.getString('answer');
+    async handleHetGeluidFindAnswerCommand(interaction: ChatInputCommandInteraction) {
+        const answer = interaction.options.getString('answer')!;
 
-        const answers = await this.discordBot.hetGeluid.findAnswer(answer);
+        const answers = await this.discordBot.hetGeluid?.findAnswer(answer);
 
         if (!answers || answers.length === 0) {
             return await this.#sendEmbedMessage(
@@ -587,13 +575,13 @@ class CommandHandler {
         await this.#sendEmbedMessage(
             interaction,
             `${answers.length} matches found`,
-            answers.map(a => `- _"${a.highlighted(answer)}"_ - guessed by ${a.name} on <t:${a.guessed_at.getTime() / 1000}:f>`).join('\n'),
+            answers.map(a => `- _"${highlightQueryInAnswer(a.answer, answer)}"_ - guessed by ${a.name} on <t:${a.guessed_at.getTime() / 1000}:f>`).join('\n'),
             '🫠',
             false
         )
     }
 
-    async handleHetGeluidSettingsCommand(interaction) {
+    async handleHetGeluidSettingsCommand(interaction: ChatInputCommandInteraction) {
         const user = await this.#getTargetUser(interaction);
         if (!user) return;
 
@@ -612,7 +600,7 @@ class CommandHandler {
             .addFields(
                 {name: 'Auto Signup', value: settings.auto_signup ? '✅ Enabled' : '❌ Disabled', inline: true},
             )
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -621,7 +609,51 @@ class CommandHandler {
         await interaction.reply({embeds: [embed]});
     }
 
-    #getLeaderboardUsers(leaderboard) {
+    /**
+     * Get the target user for the command.
+     * @param interaction
+     * @returns {Promise<Account|null>}
+     */
+    async #getTargetUser(interaction: ChatInputCommandInteraction): Promise<Account | null> {
+        let userId = interaction.user.id;
+
+        const username = interaction.options.getString('username');
+
+        let user;
+        if (username) {
+            user = this.discordBot.authBank.getUser(username);
+            if (user == null) {
+                await this.#sendNoAccountFoundMessage(interaction, username);
+                return null;
+            }
+        } else {
+            user = this.discordBot.authBank.getUserByDiscordId(userId);
+            if (user == null) {
+                await this.#sendUnauthorizedMessage(interaction);
+                return null;
+            }
+        }
+        return user;
+    }
+
+    private getPersonalTracksList(username: string) {
+        // const tracks = contestantInfo.tracks;
+        const tracks = Array.from(this.discordBot.catchTheSummerHit?.songCatchers.values() ?? [])
+            .filter((c) => c.hasUser(username));
+        let message = '';
+
+        for (let i = 0; i < tracks.length; i++) {
+            const track = tracks[i];
+
+            message += `${i + 1}. **${track.track_title} - ${track.artist_name}** (+${track.points} points)`;
+
+            if (i < tracks.length - 1) message += '\n';
+        }
+
+        return message;
+    }
+
+    #getLeaderboardUsers(leaderboard: SummerHitHighscoreUser[]) {
         let message = '';
 
         for (let i = 0; i < leaderboard.length; i++) {
@@ -638,8 +670,8 @@ class CommandHandler {
         return message;
     }
 
-    #numberToEmojis(number) {
-        const emojiMap = {
+    #numberToEmojis(number: number) {
+        const emojiMap: { [key: number]: string } = {
             0: '0️⃣',
             1: '1️⃣',
             2: '2️⃣',
@@ -656,7 +688,7 @@ class CommandHandler {
         let result = '';
 
         for (let i = 0; i < numberString.length; i++) {
-            const digit = numberString[i];
+            const digit = parseInt(numberString[i]);
             if (digit in emojiMap) {
                 result += emojiMap[digit];
             }
@@ -665,20 +697,23 @@ class CommandHandler {
         return result;
     }
 
-    async #sendEmbedMessage(interaction, title, description, emote = '❌', ephemeral = true) {
+    async #sendEmbedMessage(interaction: ChatInputCommandInteraction, title: string, description: string, emote: string = '❌', ephemeral: boolean = true) {
         const embed = new EmbedBuilder()
             .setTitle((emote ? `${emote} ` : '') + title)
             .setDescription(description)
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             });
 
-        await interaction.reply({embeds: [embed], ephemeral: ephemeral});
+        await interaction.reply({
+            embeds: [embed],
+            flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+        });
     }
 
-    async #sendNotListeningMessage(interaction) {
+    async #sendNotListeningMessage(interaction: ChatInputCommandInteraction) {
         return await this.#sendEmbedMessage(
             interaction,
             "Not listening",
@@ -686,29 +721,30 @@ class CommandHandler {
         );
     }
 
-    async #sendStoppedListeningMessage(interaction) {
+    async #sendStoppedListeningMessage(interaction: ChatInputCommandInteraction) {
         await this.#sendEmbedMessage(
             interaction,
             "📻 Stopped listening",
             "You are no longer listening to the radio.",
-            null,
+            undefined,
             false
         );
     }
 
-    async #sendListeningMessage(interaction, stationId) {
+    async #sendListeningMessage(interaction: ChatInputCommandInteraction, stationId: string) {
         const station = this.discordBot.radioListener.stations.get(stationId);
+        if (!station) return;
 
         await this.#sendEmbedMessage(
             interaction,
             "📻 Listening to " + station.name,
             "You are now listening to " + station.name + ".",
-            null,
+            undefined,
             false
         );
     }
 
-    async #sendInvalidStationMessage(interaction) {
+    async #sendInvalidStationMessage(interaction: ChatInputCommandInteraction) {
         return await this.#sendEmbedMessage(
             interaction,
             'Invalid station',
@@ -717,7 +753,7 @@ class CommandHandler {
         );
     }
 
-    async #sendGameNotAvailableMessage(interaction) {
+    async #sendGameNotAvailableMessage(interaction: ChatInputCommandInteraction) {
         return await this.#sendEmbedMessage(
             interaction,
             'Game not available',
@@ -725,7 +761,7 @@ class CommandHandler {
         );
     }
 
-    async #sendHetGeluidSoundUnavailable(interaction) {
+    async #sendHetGeluidSoundUnavailable(interaction: ChatInputCommandInteraction) {
         return this.#sendEmbedMessage(
             interaction,
             'Something went wrong',
@@ -733,7 +769,7 @@ class CommandHandler {
         );
     }
 
-    async #sendNotInVoiceChannelMessage(interaction) {
+    async #sendNotInVoiceChannelMessage(interaction: ChatInputCommandInteraction) {
         return this.#sendEmbedMessage(
             interaction,
             'Not in a voice channel',
@@ -741,7 +777,7 @@ class CommandHandler {
         );
     }
 
-    async #sendGameUnavailableMessage(interaction) {
+    async #sendGameUnavailableMessage(interaction: ChatInputCommandInteraction) {
         return this.#sendEmbedMessage(
             interaction,
             'Game unavailable',
@@ -754,7 +790,7 @@ class CommandHandler {
         );
     }
 
-    async #sendAccountLinkedMessage(interaction, username, userId) {
+    async #sendAccountLinkedMessage(interaction: ChatInputCommandInteraction, username: string, userId: string) {
         return await this.#sendEmbedMessage(
             interaction,
             "Account linked",
@@ -763,7 +799,7 @@ class CommandHandler {
         );
     }
 
-    async #sendAccountAlreadyLinkedMessage(interaction) {
+    async #sendAccountAlreadyLinkedMessage(interaction: ChatInputCommandInteraction) {
         return await this.#sendEmbedMessage(
             interaction,
             "Account already linked",
@@ -773,7 +809,7 @@ class CommandHandler {
         );
     }
 
-    async #sendInvalidCredentialsMessage(interaction) {
+    async #sendInvalidCredentialsMessage(interaction: ChatInputCommandInteraction) {
         return await this.#sendEmbedMessage(
             interaction,
             'Invalid credentials',
@@ -782,7 +818,7 @@ class CommandHandler {
         );
     }
 
-    async #sendAccountRemovedMessage(interaction, username) {
+    async #sendAccountRemovedMessage(interaction: ChatInputCommandInteraction, username: string) {
         return await this.#sendEmbedMessage(
             interaction,
             "Account removed",
@@ -791,7 +827,7 @@ class CommandHandler {
         );
     }
 
-    async #sendNoAccountFoundMessage(interaction, username) {
+    async #sendNoAccountFoundMessage(interaction: ChatInputCommandInteraction, username: string) {
         return await this.#sendEmbedMessage(
             interaction,
             "No account found",
@@ -801,7 +837,7 @@ class CommandHandler {
         );
     }
 
-    async #sendUnauthorizedMessage(interaction) {
+    async #sendUnauthorizedMessage(interaction: ChatInputCommandInteraction) {
         return await this.#sendEmbedMessage(
             interaction,
             'No account found',
@@ -813,5 +849,3 @@ class CommandHandler {
     }
 
 }
-
-module.exports = CommandHandler

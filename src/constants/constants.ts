@@ -1,0 +1,1 @@
+export const DEFAULT_EMBED_COLOR = "#eb3424";

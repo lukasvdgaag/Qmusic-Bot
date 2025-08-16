@@ -1,33 +1,28 @@
-const {EmbedBuilder} = require("discord.js");
-const QMessagesManager = require("../QMessagesManager");
-const {getNowDate} = require("../utils/TimeUtils");
+import {DiscordBot} from "../DiscordBot";
+import {QMessagesManager} from "../QMessagesManager";
+import {Account} from "../auth/Account";
+import {SongInfo} from "../radio/SongInfo";
 
-class CatchTheArtist {
+import {EmbedBuilder} from "discord.js";
+import {getNowDate} from "../helpers/TimeHelper";
+import {DEFAULT_EMBED_COLOR} from "../constants/constants";
 
-    /**
-     * @type {DiscordBot}
-     */
-    #discordBot;
-    /**
-     * @type {QMessagesManager}
-     */
-    #messagesManager;
+export class CatchTheArtist {
 
-    constructor(discordBot) {
-        this.#discordBot = discordBot;
-        this.#messagesManager = new QMessagesManager(discordBot);
+    artistCatchers: Map<string, Set<string>>;
+    private discordBot: DiscordBot;
+    private messagesManager: QMessagesManager;
 
+    constructor(discordBot: DiscordBot) {
+        this.discordBot = discordBot;
+        this.messagesManager = new QMessagesManager(discordBot);
         this.artistCatchers = new Map();
 
         this.#init();
     }
 
-    #init() {
-        this.initContestantsArtists();
-    }
-
     initContestantsArtists() {
-        const users = this.#discordBot.authBank.getUsers();
+        const users = this.discordBot.authBank.getUsers();
 
         for (const user of users) {
             this.initContestant(user);
@@ -37,7 +32,7 @@ class CatchTheArtist {
     /**
      * @param {Account} user
      */
-    initContestant(user) {
+    initContestant(user: Account) {
         const settings = user.settings.catch_the_artist;
 
         // Check if the game is enabled and if the user has an artist set
@@ -48,21 +43,14 @@ class CatchTheArtist {
             this.artistCatchers.set(artist, new Set());
         }
 
-        this.artistCatchers.get(artist).add(user.username);
-    }
-
-    #isNightTime() {
-        const now = getNowDate();
-        const hour = now.getUTCHours();
-
-        return hour < 6;
+        this.artistCatchers.get(artist)?.add(user.username);
     }
 
     /**
      * @param {SongInfo} songInfo
      * @returns {Promise<void>}
      */
-    async checkForCatch(songInfo) {
+    async checkForCatch(songInfo: SongInfo): Promise<void> {
         if (this.#isNightTime()) return;
         if (await this.checkForUpcoming(songInfo)) return;
 
@@ -70,12 +58,13 @@ class CatchTheArtist {
         if (!this.artistCatchers.has(artist)) return;
 
         const users = this.artistCatchers.get(artist);
+        if (!users) return;
 
         const notifyUsers = new Set();
         let messageUsers = [];
 
         for (const username of users) {
-            const user = await this.#discordBot.authBank.getUser(username);
+            const user = this.discordBot.authBank.getUser(username);
 
             // Check if the user is still catching this artist
             if (!user || !user.settings.catch_the_artist.enabled || user.settings.catch_the_artist.artist_name !== artist) continue;
@@ -98,7 +87,7 @@ class CatchTheArtist {
         const embed = new EmbedBuilder()
             .setTitle(`${artist} is playing right now!!`)
             .setDescription(`${artist} is playing right now on Qmusic. Go send a message in the app!`)
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setThumbnail(`https://api.qmusic.nl${songInfo.thumbnail}`)
             .setFooter({
                 text: "Q sounds better with you!",
@@ -116,7 +105,7 @@ class CatchTheArtist {
 
         embed.addFields({name: 'Listen live', value: 'https://qmusic.nl/luister/qmusic_nl', inline: false});
 
-        await this.#discordBot.sendMessage({
+        await this.discordBot.sendMessage({
             content: content,
             embeds: [embed]
         })
@@ -127,11 +116,11 @@ class CatchTheArtist {
      * @param {string} message
      * @returns {Promise<Account[]>}
      */
-    async sendAppMessages(users, message) {
+    async sendAppMessages(users: Account[], message: string): Promise<Account[]> {
         const promises = [];
 
         for (const user of users) {
-            promises.push(this.#messagesManager.sendMessage(user, message));
+            promises.push(this.messagesManager.sendMessage(user, message));
         }
 
         const results = await Promise.allSettled(promises);
@@ -151,7 +140,7 @@ class CatchTheArtist {
      * @param {SongInfo} songInfo
      * @returns {Promise<boolean>}
      */
-    async checkForUpcoming(songInfo) {
+    async checkForUpcoming(songInfo: SongInfo): Promise<boolean> {
         // check if there is a next song
         if (!songInfo.next) return false;
 
@@ -159,10 +148,11 @@ class CatchTheArtist {
         if (!this.artistCatchers.has(artist)) return false;
 
         const users = this.artistCatchers.get(artist);
+        if (!users) return false;
 
         const notifyUsers = new Set();
         for (const username of users) {
-            const user = this.#discordBot.authBank.getUser(username);
+            const user = this.discordBot.authBank.getUser(username);
             if (!user || !user.settings.catch_the_artist.enabled || user.settings.catch_the_artist.artist_name !== artist || !user.settings.catch_the_artist.notify_when_upcoming) continue;
 
             if (user.discord_id) notifyUsers.add(`<@${user.discord_id}>`);
@@ -175,7 +165,7 @@ class CatchTheArtist {
         const embed = new EmbedBuilder()
             .setTitle(`${artist} is coming up next!`)
             .setDescription(`${artist} is coming up next on Qmusic. Get your app ready!`)
-            .setColor(process.env.MAIN_COLOR)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setThumbnail(`https://api.qmusic.nl${songInfo.next.thumbnail}`)
             .setFooter({
                 text: "Q sounds better with you!",
@@ -188,14 +178,23 @@ class CatchTheArtist {
                 {name: 'Listen live', value: 'https://qmusic.nl/luister/qmusic_nl', inline: false}
             )
 
-        await this.#discordBot.sendMessage({
+        await this.discordBot.sendMessage({
             content: content,
             embeds: [embed]
         });
         return true;
     }
 
+    #init() {
+        this.initContestantsArtists();
+    }
+
+    #isNightTime() {
+        const now = getNowDate();
+        const hour = now.getUTCHours();
+
+        return hour < 6;
+    }
+
 
 }
-
-module.exports = CatchTheArtist;

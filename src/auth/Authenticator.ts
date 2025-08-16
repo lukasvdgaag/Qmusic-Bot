@@ -1,5 +1,6 @@
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
 puppeteer.use(StealthPlugin());
 
 /**
@@ -10,7 +11,7 @@ puppeteer.use(StealthPlugin());
  * @version 3.0.0
  * @since 1.1.0
  */
-class Authenticator {
+export class Authenticator {
 
     /**
      * Returns the bearer token for the given credentials using a headless browser.
@@ -18,7 +19,7 @@ class Authenticator {
      * @param {string} password The password of the account.
      * @returns {Promise<string|null>} Bearer token or null if the credentials are invalid.
      */
-    async processLogin(username, password) {
+    async processLogin(username: string, password: string): Promise<string | null> {
         const browser = await puppeteer.launch({
             headless: true,
             args: [
@@ -56,7 +57,7 @@ class Authenticator {
             // wait for authentication to complete
             await page.waitForFunction(
                 'window.location.href === "https://qmusic.nl/"',
-                { timeout: 15000 }
+                {timeout: 15000}
             );
 
             // Step 4: The final page sets the token. We can now extract it from the page's localStorage.
@@ -68,11 +69,9 @@ class Authenticator {
             await browser.close();
             return token;
         } catch (e) {
-            console.error("An error occurred during the login process:", e.message);
+            console.error("An error occurred during the login process:", ((e instanceof Error) ? e.message : "error"));
             await browser?.close();
             return null;
         }
     }
 }
-
-module.exports = Authenticator;

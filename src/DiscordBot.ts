@@ -1,18 +1,41 @@
-const {
-    Client, GatewayIntentBits, SlashCommandBuilder, SlashCommandSubcommandBuilder, SlashCommandIntegerOption, SlashCommandStringOption, CommandInteraction,
-    SlashCommandUserOption, MessagePayload, SlashCommandBooleanOption, Attachment
-} = require("discord.js");
-const CommandHandler = require("./CommandHandler");
-const CatchTheSummerHit = require("./games/CatchTheSummerHit");
-const SocketListener = require("./SocketListener");
-const CatchTheArtist = require("./games/CatchTheArtist");
-const RadioListener = require("./radio/RadioListener");
-const {getNowDate} = require("./utils/TimeUtils");
-const HetGeluid = require("./games/HetGeluid");
+import {
+    ChatInputCommandInteraction,
+    Client,
+    GatewayIntentBits,
+    Interaction,
+    Message,
+    MessageCreateOptions,
+    MessageFlags,
+    MessagePayload,
+    SlashCommandBooleanOption,
+    SlashCommandBuilder,
+    SlashCommandIntegerOption,
+    SlashCommandStringOption,
+    SlashCommandSubcommandBuilder,
+    SlashCommandUserOption
+} from "discord.js";
+import {CommandHandler} from "./CommandHandler";
+import {SocketListener} from "./SocketListener";
+import {CatchTheArtist} from "./games/CatchTheArtist";
+import {RadioListener} from "./radio/RadioListener";
+import {getNowDate} from "./helpers/TimeHelper";
+import {HetGeluid} from "./games/HetGeluid";
+import {AuthBank} from "./auth/AuthBank";
+import {CatchTheSummerHit} from "./games/catchthesummerhit/CatchTheSummerHit";
+import {CatchTheSummerHitV2} from "./games/catchthesummerhit/CatchTheSummerHitV2";
 
-class DiscordBot {
+export class DiscordBot {
 
-    constructor(authBank) {
+    authBank: AuthBank;
+    client: Client;
+    radioListener: RadioListener;
+    catchTheArtist?: CatchTheArtist;
+    socket?: SocketListener;
+    hetGeluid?: HetGeluid;
+    commandHandler?: CommandHandler;
+    catchTheSummerHit?: CatchTheSummerHit;
+
+    constructor(authBank: AuthBank) {
         this.client = new Client({
             intents: [
                 GatewayIntentBits.Guilds,
@@ -28,7 +51,37 @@ class DiscordBot {
         this.radioListener = new RadioListener(this);
 
         this.#initListeners();
-        this.client.login(process.env.DISCORD_TOKEN)
+        console.log(`Discord bot initialized. Connecting... ${process.env.DISCORD_TOKEN}`);
+        this.client.login(process.env.DISCORD_TOKEN).then()
+    }
+
+    /**
+     * Send a message to a channel
+     * @param {string|MessagePayload|MessageCreateOptions} message The message to send
+     * @param {string} channelId The ID of the channel to send the message to
+     * @returns {Promise<Message|undefined>}
+     */
+    async sendMessage(
+        message: string | MessagePayload | MessageCreateOptions,
+        channelId: string = process.env.DISCORD_CHANNEL_ID as string
+    ): Promise<Message | undefined> {
+        if (!channelId) {
+            console.error(`Couldn't send message: No channel ID provided`);
+            return;
+        }
+        const channel = this.client.channels.cache.get(channelId) ?? await this.client.channels.fetch(channelId);
+        if (!channel || !channel.isSendable()) {
+            console.error(`Couldn't send message: Channel with ID ${channelId} not found`);
+            return;
+        }
+
+        return await channel.send(message);
+    }
+
+    isNightTime() {
+        const now = getNowDate();
+        const hour = now.getHours();
+        return hour >= 3 && hour < 6;
     }
 
     #initListeners() {
@@ -36,13 +89,13 @@ class DiscordBot {
             await this.radioListener.loadStations();
             this.#initCommands();
 
-            this.catchTheSummerHit = new CatchTheSummerHit(this);
+            this.catchTheSummerHit = new CatchTheSummerHitV2(this);
             this.catchTheArtist = new CatchTheArtist(this);
             this.commandHandler = new CommandHandler(this);
             this.hetGeluid = new HetGeluid(this);
             this.socket = new SocketListener(this);
 
-            console.log(`Bot is ready. Logged in as ${this.client.user.tag}`);
+            console.log(`Bot is ready. Logged in as ${this.client.user?.tag}`);
         });
 
         this.client.on('interactionCreate', async interaction => {
@@ -50,6 +103,8 @@ class DiscordBot {
         });
 
         this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            if (!this.client?.user) return;
+
             const botId = this.client.user.id;
 
             const oldChannel = oldState.channel;
@@ -57,16 +112,16 @@ class DiscordBot {
 
             // check if there is no one left in the voice channel
             if (oldChannel && oldChannel.members.size === 1 && oldChannel.members.has(botId)) {
-                this.radioListener.stop();
+                await this.radioListener.stop();
                 await this.sendMessage("Leaving the voice channel because I'm alone :pensive:.");
                 return;
             }
 
-            if (newState.member.id !== botId) return;
+            if (newState.member?.id !== botId) return;
 
             // bot got disconnected / kicked
             if (oldChannel && !newChannel && this.radioListener.activeChannel) {
-                this.radioListener.stop();
+                await this.radioListener.stop();
                 await this.sendMessage("I got kicked from the channel. Stopping the radio.");
                 return;
             }
@@ -81,6 +136,10 @@ class DiscordBot {
     }
 
     #initCommands() {
+        if (!this.client?.application) {
+            return;
+        }
+
         /*
         /summerhit about
         /summerhit trackoftheday
@@ -276,8 +335,10 @@ class DiscordBot {
         this.client.application.commands.set(commands).catch(console.error);
     }
 
-    async #handleInteraction(interaction) {
-        if (interaction instanceof CommandInteraction) {
+    async #handleInteraction(interaction: Interaction) {
+        if (!this.commandHandler) return;
+
+        if (interaction instanceof ChatInputCommandInteraction) {
             if (interaction.commandName === 'qmusic') {
                 const subCommand = interaction.options.getSubcommand(false);
 
@@ -313,8 +374,11 @@ class DiscordBot {
                         await this.commandHandler.handleSummerHitLeaderboardCommand(interaction);
                         break;
                     case 'entercode':
-                        const code = interaction.options.getString('code');
-                        await interaction.reply({content: 'This command is not yet implemented', ephemeral: true});
+                        // const code = interaction.options.getString('code');
+                        await interaction.reply({
+                            content: 'This command is not yet implemented',
+                            flags: [MessageFlags.Ephemeral],
+                        });
                         break;
                     case 'settings':
                         await this.commandHandler.handleSummerHitSettingsCommand(interaction);
@@ -350,24 +414,4 @@ class DiscordBot {
 
     }
 
-    /**
-     * Send a message to a channel
-     * @param {string|MessagePayload} message The message to send
-     * @param {string} channelId The ID of the channel to send the message to
-     * @returns {Promise<Message<true>>}
-     */
-    async sendMessage(message, channelId = process.env.DISCORD_CHANNEL_ID) {
-        const channel = this.client.channels.cache.get(channelId) ?? await this.client.channels.fetch(channelId);
-
-        return await channel.send(message);
-    }
-
-    isNightTime() {
-        const now = getNowDate();
-        const hour = now.getHours();
-        return hour >= 3 && hour < 6;
-    }
-
 }
-
-module.exports = DiscordBot;
