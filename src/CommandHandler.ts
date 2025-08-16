@@ -1,18 +1,19 @@
 import {
     ActionRowBuilder,
-    BaseInteraction,
     ButtonBuilder,
     ButtonStyle,
     ChatInputCommandInteraction,
-    ColorResolvable,
     CommandInteraction,
     EmbedBuilder,
-    GuildMember, Interaction
+    GuildMember,
+    MessageFlags
 } from "discord.js";
 import {DiscordBot} from "./DiscordBot";
 import {SummerHitInfo} from "./games/objects/SummerHitInfo";
-import {SummerHitHighscores, SummerHitHighscoreUser} from "./games/objects/SummerHitHighscores";
-import {HetGeluidAttempt, highlightQueryInAnswer} from "./games/objects/HetGeluidAttempt";
+import {SummerHitHighscoreUser} from "./games/objects/SummerHitHighscores";
+import {highlightQueryInAnswer} from "./games/objects/HetGeluidAttempt";
+import {Account} from "./auth/Account";
+import {DEFAULT_EMBED_COLOR} from "./constants/constants";
 
 export class CommandHandler {
 
@@ -60,7 +61,7 @@ export class CommandHandler {
                 text: "Meer informatie: https://qmusic.nl/speel-mee-met-catch-the-summerhit-2023",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             })
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         await interaction.reply({embeds: [embed]});
     }
@@ -136,7 +137,7 @@ export class CommandHandler {
                 value: this.getPersonalTracksList(user.username),
                 inline: false
             })
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         await interaction.reply({embeds: [embed]});
     }
@@ -191,7 +192,7 @@ export class CommandHandler {
                 value: this.#getLeaderboardUsers(userLeaderboard.top),
                 inline: false
             })
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         await interaction.reply({embeds: [embed]});
     }
@@ -250,7 +251,7 @@ export class CommandHandler {
         const embed = new EmbedBuilder()
             .setTitle("🏝️ Catch The Summer Hit Leaderboard")
             .setDescription(`Internal leaderboard for Catch The Summer Hit.`)
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -306,33 +307,6 @@ export class CommandHandler {
         await this.#sendAccountRemovedMessage(interaction, user.username);
     }
 
-    /**
-     * Get the target user for the command.
-     * @param interaction
-     * @returns {Promise<Account|null>}
-     */
-    async #getTargetUser(interaction: ChatInputCommandInteraction) {
-        let userId = interaction.user.id;
-
-        const username = interaction.options.getString('username');
-
-        let user;
-        if (username) {
-            user = this.discordBot.authBank.getUser(username);
-            if (user == null) {
-                await this.#sendNoAccountFoundMessage(interaction, username);
-                return null;
-            }
-        } else {
-            user = this.discordBot.authBank.getUserByDiscordId(userId);
-            if (user == null) {
-                await this.#sendUnauthorizedMessage(interaction);
-                return null;
-            }
-        }
-        return user;
-    }
-
     async handleSummerHitSettingsCommand(interaction: ChatInputCommandInteraction) {
         const userId = interaction.user.id;
 
@@ -374,7 +348,7 @@ export class CommandHandler {
                     value: settings.catch_at_night ? '✅ We will catch songs at night (between 2 and 6)!' : '❌ We will __not__ catch songs at night (between 2 and 6).',
                     inline: true
                 },
-            ).setColor(process.env.MAIN_COLOR as ColorResolvable)
+            ).setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -450,7 +424,7 @@ export class CommandHandler {
         if (enable != null || notify != null || artist != null || sendAppMessage != null || notifyWhenUpcoming != null) {
             await this.discordBot.authBank.saveUsers();
 
-            this.discordBot.catchTheArtist.initContestant(user);
+            this.discordBot.catchTheArtist?.initContestant(user);
         }
 
         const embed = new EmbedBuilder()
@@ -475,7 +449,7 @@ export class CommandHandler {
                     inline: true
                 },
             )
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -499,7 +473,7 @@ export class CommandHandler {
                 name: 'Points',
                 value: `+ ${trackOfTheDay?.points ?? 0} points`,
             })
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -508,29 +482,16 @@ export class CommandHandler {
         return embed;
     }
 
-    private getPersonalTracksList(username: string) {
-        // const tracks = contestantInfo.tracks;
-        const tracks = Array.from(this.discordBot.catchTheSummerHit?.songCatchers.values() ?? [])
-            .filter((c) => c.hasUser(username));
-        let message = '';
-
-        for (let i = 0; i < tracks.length; i++) {
-            const track = tracks[i];
-
-            message += `${i + 1}. **${track.track_title} - ${track.artist_name}** (+${track.points} points)`;
-
-            if (i < tracks.length - 1) message += '\n';
-        }
-
-        return message;
-    }
-
     async handleHetGeluidInfoCommand(interaction: ChatInputCommandInteraction) {
-        const soundInfo = await this.discordBot.hetGeluid.fetchSoundInfo();
+        const soundInfo = await this.discordBot.hetGeluid?.fetchSoundInfo();
 
         if (!soundInfo) return await this.#sendHetGeluidSoundUnavailable(interaction);
 
-        const answers = await this.discordBot.hetGeluid.fetchAnswers();
+        const answers = await this.discordBot.hetGeluid?.fetchAnswers();
+        if (!answers) {
+            console.log('No answers found for Het Geluid');
+            return await this.#sendHetGeluidSoundUnavailable(interaction);
+        }
 
         let audioName = soundInfo.getAudioName();
         const embed = new EmbedBuilder()
@@ -539,7 +500,7 @@ export class CommandHandler {
                 {name: 'Value', value: `€ ${new Intl.NumberFormat('nl-NL').format(soundInfo.amount)}`, inline: true},
                 {name: 'Audio Name', value: audioName ? `\`${audioName.replace('.mp3', '')}\`` : '❌ Not available', inline: true}
             )
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
@@ -568,13 +529,13 @@ export class CommandHandler {
         const user = await this.#getTargetUser(interaction);
         if (!user) return;
 
-        let currentSignupMoment = await this.discordBot.hetGeluid.getCurrentSignUpMoment();
+        let currentSignupMoment = await this.discordBot.hetGeluid?.getCurrentSignUpMoment();
         if (!currentSignupMoment) {
             console.log('Het Geluid is not available at the moment');
             return await this.#sendHetGeluidSoundUnavailable(interaction);
         }
 
-        const subscribed = await this.discordBot.hetGeluid.hasUserSubscribed(user.username, currentSignupMoment);
+        const subscribed = await this.discordBot.hetGeluid?.hasUserSubscribed(user.username, currentSignupMoment);
         console.log('subscribed', subscribed)
         if (subscribed) {
             return await this.#sendEmbedMessage(
@@ -585,8 +546,7 @@ export class CommandHandler {
             );
         }
 
-        currentSignupMoment = await this.discordBot.hetGeluid.subscribeUser(user.username);
-        console.log(currentSignupMoment)
+        currentSignupMoment = await this.discordBot.hetGeluid?.subscribeUser(user.username);
         if (!currentSignupMoment) return await this.#sendHetGeluidSoundUnavailable(interaction);
 
         await this.#sendEmbedMessage(
@@ -600,7 +560,7 @@ export class CommandHandler {
     async handleHetGeluidFindAnswerCommand(interaction: ChatInputCommandInteraction) {
         const answer = interaction.options.getString('answer')!;
 
-        const answers: HetGeluidAttempt[] = await this.discordBot.hetGeluid?.findAnswer(answer);
+        const answers = await this.discordBot.hetGeluid?.findAnswer(answer);
 
         if (!answers || answers.length === 0) {
             return await this.#sendEmbedMessage(
@@ -640,13 +600,57 @@ export class CommandHandler {
             .addFields(
                 {name: 'Auto Signup', value: settings.auto_signup ? '✅ Enabled' : '❌ Disabled', inline: true},
             )
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             })
 
         await interaction.reply({embeds: [embed]});
+    }
+
+    /**
+     * Get the target user for the command.
+     * @param interaction
+     * @returns {Promise<Account|null>}
+     */
+    async #getTargetUser(interaction: ChatInputCommandInteraction): Promise<Account | null> {
+        let userId = interaction.user.id;
+
+        const username = interaction.options.getString('username');
+
+        let user;
+        if (username) {
+            user = this.discordBot.authBank.getUser(username);
+            if (user == null) {
+                await this.#sendNoAccountFoundMessage(interaction, username);
+                return null;
+            }
+        } else {
+            user = this.discordBot.authBank.getUserByDiscordId(userId);
+            if (user == null) {
+                await this.#sendUnauthorizedMessage(interaction);
+                return null;
+            }
+        }
+        return user;
+    }
+
+    private getPersonalTracksList(username: string) {
+        // const tracks = contestantInfo.tracks;
+        const tracks = Array.from(this.discordBot.catchTheSummerHit?.songCatchers.values() ?? [])
+            .filter((c) => c.hasUser(username));
+        let message = '';
+
+        for (let i = 0; i < tracks.length; i++) {
+            const track = tracks[i];
+
+            message += `${i + 1}. **${track.track_title} - ${track.artist_name}** (+${track.points} points)`;
+
+            if (i < tracks.length - 1) message += '\n';
+        }
+
+        return message;
     }
 
     #getLeaderboardUsers(leaderboard: SummerHitHighscoreUser[]) {
@@ -667,7 +671,7 @@ export class CommandHandler {
     }
 
     #numberToEmojis(number: number) {
-        const emojiMap: {[key: number]: string} = {
+        const emojiMap: { [key: number]: string } = {
             0: '0️⃣',
             1: '1️⃣',
             2: '2️⃣',
@@ -697,13 +701,16 @@ export class CommandHandler {
         const embed = new EmbedBuilder()
             .setTitle((emote ? `${emote} ` : '') + title)
             .setDescription(description)
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             });
 
-        await interaction.reply({embeds: [embed], ephemeral: ephemeral});
+        await interaction.reply({
+            embeds: [embed],
+            flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+        });
     }
 
     async #sendNotListeningMessage(interaction: ChatInputCommandInteraction) {
@@ -842,5 +849,3 @@ export class CommandHandler {
     }
 
 }
-
-module.exports = CommandHandler

@@ -1,10 +1,11 @@
 import axios, {AxiosResponse} from 'axios';
 import {SummerHitInfo} from "./objects/SummerHitInfo";
-import {ColorResolvable, EmbedBuilder} from "discord.js";
+import {EmbedBuilder} from "discord.js";
 import {getNow, isNextDay} from "../helpers/TimeHelper";
 import {DiscordBot} from "../DiscordBot";
 import {SummerHitHighscores} from "./objects/SummerHitHighscores";
 import {SummerHitContestant} from "./objects/SummerHitContestant";
+import {DEFAULT_EMBED_COLOR} from "../constants/constants";
 
 export class CatchTheSummerHit {
 
@@ -19,33 +20,6 @@ export class CatchTheSummerHit {
         this.discordBot = discordBot;
 
         this.#init().catch(console.error);
-    }
-
-    async #init() {
-        // checking game availability
-        this.available = await this.#isGameAvailable();
-        if (!this.available) this.trackOfTheDayLastUpdated = Date.now();
-
-        await this.loadTrackOfTheDay();
-        await this.initContestantsTracks();
-
-        // start an interval that checks if it's the next day every 5 minutes
-        setInterval(async () => {
-            await this.checkForNewDay();
-        }, 1000 * 60 * 5);
-    }
-
-    async #isGameAvailable() {
-        try {
-            const response = await axios.get(BASE_URL);
-
-            if (response.status !== 200) return false;
-
-            // check if json body contains "game" and if game.currentState === 'ended' or the game.endDate is in the past
-            return response.data?.game?.currentState !== 'ended' && new Date(response.data?.game?.endsAt).getTime() > Date.now();
-        } catch (e) {
-            return false;
-        }
     }
 
     checkForNewDay = async (force = false) => {
@@ -185,8 +159,12 @@ export class CatchTheSummerHit {
     }
 
     async getHighscoresForUser(username: string, limit: number): Promise<SummerHitHighscores | undefined>;
-    async getHighscoresForUser(username: string, limit: number, returnRaw: true): Promise<AxiosResponse<{highscores: SummerHitHighscores}> | undefined>;
-    async getHighscoresForUser(username: string, limit: number, returnRaw: boolean = false): Promise<SummerHitHighscores | AxiosResponse<{highscores: SummerHitHighscores}> | undefined> {
+
+    async getHighscoresForUser(username: string, limit: number, returnRaw: true): Promise<AxiosResponse<{ highscores: SummerHitHighscores }> | undefined>;
+
+    async getHighscoresForUser(username: string, limit: number, returnRaw: boolean = false): Promise<SummerHitHighscores | AxiosResponse<{
+        highscores: SummerHitHighscores
+    }> | undefined> {
         if (!this.available) return undefined;
 
         const user = this.discordBot.authBank.getUser(username);
@@ -301,7 +279,7 @@ export class CatchTheSummerHit {
                 {name: 'Caught for', value: users.join(', ')}
             )
             .setThumbnail(`https://cdn-radio.dpgmedia.net/site/w480${songInfo.track_thumbnail}`)
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
             .setFooter({
                 text: 'Summer Hit Catcher for Qmusic',
             })
@@ -311,6 +289,33 @@ export class CatchTheSummerHit {
             embeds: [embed]
         })
 
+    }
+
+    async #init() {
+        // checking game availability
+        this.available = await this.#isGameAvailable();
+        if (!this.available) this.trackOfTheDayLastUpdated = Date.now();
+
+        await this.loadTrackOfTheDay();
+        await this.initContestantsTracks();
+
+        // start an interval that checks if it's the next day every 5 minutes
+        setInterval(async () => {
+            await this.checkForNewDay();
+        }, 1000 * 60 * 5);
+    }
+
+    async #isGameAvailable() {
+        try {
+            const response = await axios.get(BASE_URL);
+
+            if (response.status !== 200) return false;
+
+            // check if json body contains "game" and if game.currentState === 'ended' or the game.endDate is in the past
+            return response.data?.game?.currentState !== 'ended' && new Date(response.data?.game?.endsAt).getTime() > Date.now();
+        } catch (e) {
+            return false;
+        }
     }
 
 }

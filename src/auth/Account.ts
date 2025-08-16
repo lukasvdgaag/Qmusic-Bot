@@ -6,5 +6,5 @@ export interface Account {
     settings: IAccountSettings;
     discord_id?: string;
     expires?: number;
-    token?: string;
+    token?: string | null;
 }

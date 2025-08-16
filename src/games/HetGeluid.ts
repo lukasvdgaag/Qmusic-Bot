@@ -7,44 +7,15 @@ import {getNow} from "../helpers/TimeHelper";
 
 export class HetGeluid {
 
+    available: boolean = false;
     private discordBot: DiscordBot;
     private currentSignupMoment?: SignUpMoment;
     private lastSignUpMomentId?: number;
-    available: boolean = false;
 
     constructor(discordBot: DiscordBot) {
         this.discordBot = discordBot;
 
         this.#init().catch(console.error);
-    }
-
-    async #init() {
-        const info = await this.fetchSoundInfo();
-        this.available = !!info;
-
-        if (!this.available) return;
-
-        this.#checkSignUpMoment().catch(console.error);
-
-        // set interval to check if users need to be resubscribed. Check every 5 minutes if the sign-up moment didn't change
-        setInterval(async () => {
-            await this.#checkSignUpMoment();
-        }, 1000 * 60 * 5);
-    }
-
-    async #checkSignUpMoment() {
-        const moment = await this.getCurrentSignUpMoment();
-        if (!moment) return;
-
-        if (this.lastSignUpMomentId !== moment.id) {
-            this.lastSignUpMomentId = moment.id;
-
-            await Promise.all(
-                [...this.discordBot.authBank.getUsers()]
-                    .filter(a => a.settings.het_geluid.auto_signup)
-                    .map(a => this.subscribeUser(a.username, true))
-            );
-        }
     }
 
     /**
@@ -123,16 +94,16 @@ export class HetGeluid {
      * Subscribe the given user to the current sign-up moment.
      * Returns the sign-up moment if successful, false otherwise
      * @param username
-     * @returns {Promise<SignUpMoment.ts|false>}
+     * @returns {Promise<SignUpMoment|undefined>}
      */
-    async subscribeUser(username: string, sendMessage: boolean = false) {
+    async subscribeUser(username: string, sendMessage: boolean = false): Promise<SignUpMoment | undefined> {
         const account = this.discordBot.authBank.getUser(username);
-        if (!account || !account.token) return false;
+        if (!account || !account.token) return undefined;
 
         try {
             const signUpMoment = await this.getCurrentSignUpMoment();
 
-            if (!signUpMoment || await this.hasUserSubscribed(username, signUpMoment)) return false;
+            if (!signUpMoment || await this.hasUserSubscribed(username, signUpMoment)) return undefined;
 
             const response = await axios.post(`https://api.qmusic.nl/2.9/app/sign_up_moments/${signUpMoment.id}/sign_up`, {
                 code: "geluid"
@@ -147,9 +118,9 @@ export class HetGeluid {
                 if (sendMessage) await this.discordBot.sendMessage(`\`${username}\` is aangemeld voor het geluid van <t:${signUpMoment.hiddenAt.getTime() / 1000}:D>`);
                 return signUpMoment;
             }
-            return false;
+            return undefined;
         } catch (e) {
-            return false;
+            return undefined;
         }
     }
 
@@ -169,6 +140,35 @@ export class HetGeluid {
             return this.currentSignupMoment;
         } catch (e) {
             return undefined;
+        }
+    }
+
+    async #init() {
+        const info = await this.fetchSoundInfo();
+        this.available = !!info;
+
+        if (!this.available) return;
+
+        this.#checkSignUpMoment().catch(console.error);
+
+        // set interval to check if users need to be resubscribed. Check every 5 minutes if the sign-up moment didn't change
+        setInterval(async () => {
+            await this.#checkSignUpMoment();
+        }, 1000 * 60 * 5);
+    }
+
+    async #checkSignUpMoment() {
+        const moment = await this.getCurrentSignUpMoment();
+        if (!moment) return;
+
+        if (this.lastSignUpMomentId !== moment.id) {
+            this.lastSignUpMomentId = moment.id;
+
+            await Promise.all(
+                [...this.discordBot.authBank.getUsers()]
+                    .filter(a => a.settings.het_geluid.auto_signup)
+                    .map(a => this.subscribeUser(a.username, true))
+            );
         }
     }
 

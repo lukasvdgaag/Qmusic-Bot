@@ -13,13 +13,16 @@ export class AuthBank {
 
     constructor() {
         this.filepath = path.resolve(__dirname, "../tokens.json");
+        console.log(`AuthBank filepath: ${this.filepath}`);
         this.users = new Map<string, Account>();
     }
 
     async loadUsers() {
+        // create the file if it doesn't exist
         await fs.access(this.filepath).catch(() =>
             fs.writeFile(this.filepath, '{}', 'utf8')
         );
+
         const data = await fs.readFile(this.filepath, 'utf8');
         const jsonUsers = JSON.parse(data);
 
@@ -106,21 +109,6 @@ export class AuthBank {
         return exp < currentTime + 3600;
     }
 
-    private getTokenExpirationDate = (token?: string): number | undefined => {
-        if (!token) return undefined;
-
-        const decoded = jwt.decode(token);
-        // If there is no expiration date, the token is invalid
-        return decoded ? (decoded as any).exp as number : undefined;
-    }
-
-    private generateNewToken = async (username: string) => {
-        let user = this.getUser(username);
-        if (!user) return undefined;
-
-        return await new Authenticator().processLogin(user.username, user.password);
-    }
-
     refreshTokens = async () => {
         await this.loadUsers();
         for (const user of this.users.values()) {
@@ -131,7 +119,7 @@ export class AuthBank {
 
     refreshUserToken = async (username: string, save: boolean = true, force: boolean = false) => {
         const user = this.getUser(username);
-        if (user == null) return;
+        if (!user) return;
 
         if (force || !user.token || this.isTokenExpired(user.token)) {
             user.token = await this.generateNewToken(user.username);
@@ -147,6 +135,21 @@ export class AuthBank {
         setTimeout(async () => {
             await this.refreshUserToken(username, true, true);
         }, timeToRefresh * 1000);
+    }
+
+    private getTokenExpirationDate = (token?: string): number | undefined => {
+        if (!token) return undefined;
+
+        const decoded = jwt.decode(token);
+        // If there is no expiration date, the token is invalid
+        return decoded ? (decoded as any).exp as number : undefined;
+    }
+
+    private generateNewToken = async (username: string) => {
+        let user = this.getUser(username);
+        if (!user) return undefined;
+
+        return (await new Authenticator().processLogin(user.username, user.password)) ?? undefined;
     }
 
 }

@@ -1,13 +1,12 @@
 import axios from "axios";
 import {StationInfo} from "./StationInfo";
 import {AudioPlayer, AudioPlayerStatus, createAudioPlayer, createAudioResource, joinVoiceChannel} from '@discordjs/voice';
-import {APIApplicationCommandOptionChoice, ColorResolvable, EmbedBuilder, Message, RestOrArray, VoiceBasedChannel} from "discord.js";
+import {APIApplicationCommandOptionChoice, EmbedBuilder, Message, RestOrArray, VoiceBasedChannel} from "discord.js";
 import {DiscordBot} from "../DiscordBot";
 import {SongInfo} from "./SongInfo";
+import {DEFAULT_EMBED_COLOR} from "../constants/constants";
 
 export class RadioListener {
-
-    private discordBot: DiscordBot;
 
     stations: Map<string, StationInfo>;
     messageChannelId?: string;
@@ -15,6 +14,7 @@ export class RadioListener {
     activeStation?: string;
     activeChannel?: string;
     player?: AudioPlayer;
+    private discordBot: DiscordBot;
 
     constructor(discordBot: DiscordBot) {
         this.stations = new Map();
@@ -118,7 +118,7 @@ export class RadioListener {
                 text: "Q sounds better with you!",
                 iconURL: "https://www.radio.net/images/broadcasts/e8/c0/114914/1/c300.png"
             })
-            .setColor(process.env.MAIN_COLOR as ColorResolvable)
+            .setColor(DEFAULT_EMBED_COLOR)
 
         if (songInfo.next) {
             embed.addFields({name: 'Up next', value: `${songInfo.next.title} - ${songInfo.next.artist}`, inline: false})

@@ -8,7 +8,7 @@ export interface SummerHitTrack {
     date?: number;
 }
 
-export class SummerHitInfo implements SummerHitTrack{
+export class SummerHitInfo implements SummerHitTrack {
     points!: number;
     track_title!: string;
     artist_name!: string;

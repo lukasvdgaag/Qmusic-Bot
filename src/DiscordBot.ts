@@ -1,16 +1,18 @@
 import {
+    ChatInputCommandInteraction,
     Client,
-    CommandInteraction,
     GatewayIntentBits,
     Interaction,
+    Message,
+    MessageCreateOptions,
+    MessageFlags,
     MessagePayload,
     SlashCommandBooleanOption,
     SlashCommandBuilder,
     SlashCommandIntegerOption,
     SlashCommandStringOption,
     SlashCommandSubcommandBuilder,
-    SlashCommandUserOption,
-    CommandInteractionOptionResolver, ChatInputCommandInteraction, TextBasedChannel, MessageCreateOptions
+    SlashCommandUserOption
 } from "discord.js";
 import {CommandHandler} from "./CommandHandler";
 import {CatchTheSummerHit} from "./games/CatchTheSummerHit";
@@ -26,7 +28,7 @@ export class DiscordBot {
     authBank: AuthBank;
     client: Client;
     radioListener: RadioListener;
-    catchTheArtist: CatchTheArtist;
+    catchTheArtist?: CatchTheArtist;
     socket?: SocketListener;
     hetGeluid?: HetGeluid;
     commandHandler?: CommandHandler;
@@ -48,7 +50,37 @@ export class DiscordBot {
         this.radioListener = new RadioListener(this);
 
         this.#initListeners();
-        this.client.login(process.env.DISCORD_TOKEN)
+        console.log(`Discord bot initialized. Connecting... ${process.env.DISCORD_TOKEN}`);
+        this.client.login(process.env.DISCORD_TOKEN).then()
+    }
+
+    /**
+     * Send a message to a channel
+     * @param {string|MessagePayload|MessageCreateOptions} message The message to send
+     * @param {string} channelId The ID of the channel to send the message to
+     * @returns {Promise<Message|undefined>}
+     */
+    async sendMessage(
+        message: string | MessagePayload | MessageCreateOptions,
+        channelId: string = process.env.DISCORD_CHANNEL_ID as string
+    ): Promise<Message | undefined> {
+        if (!channelId) {
+            console.error(`Couldn't send message: No channel ID provided`);
+            return;
+        }
+        const channel = this.client.channels.cache.get(channelId) ?? await this.client.channels.fetch(channelId);
+        if (!channel || !channel.isSendable()) {
+            console.error(`Couldn't send message: Channel with ID ${channelId} not found`);
+            return;
+        }
+
+        return await channel.send(message);
+    }
+
+    isNightTime() {
+        const now = getNowDate();
+        const hour = now.getHours();
+        return hour >= 3 && hour < 6;
     }
 
     #initListeners() {
@@ -79,7 +111,7 @@ export class DiscordBot {
 
             // check if there is no one left in the voice channel
             if (oldChannel && oldChannel.members.size === 1 && oldChannel.members.has(botId)) {
-                this.radioListener.stop();
+                await this.radioListener.stop();
                 await this.sendMessage("Leaving the voice channel because I'm alone :pensive:.");
                 return;
             }
@@ -303,6 +335,8 @@ export class DiscordBot {
     }
 
     async #handleInteraction(interaction: Interaction) {
+        if (!this.commandHandler) return;
+
         if (interaction instanceof ChatInputCommandInteraction) {
             if (interaction.commandName === 'qmusic') {
                 const subCommand = interaction.options.getSubcommand(false);
@@ -339,8 +373,11 @@ export class DiscordBot {
                         await this.commandHandler.handleSummerHitLeaderboardCommand(interaction);
                         break;
                     case 'entercode':
-                        const code = interaction.options.getString('code');
-                        await interaction.reply({content: 'This command is not yet implemented', ephemeral: true});
+                        // const code = interaction.options.getString('code');
+                        await interaction.reply({
+                            content: 'This command is not yet implemented',
+                            flags: [MessageFlags.Ephemeral],
+                        });
                         break;
                     case 'settings':
                         await this.commandHandler.handleSummerHitSettingsCommand(interaction);
@@ -374,32 +411,6 @@ export class DiscordBot {
             }
         }
 
-    }
-
-    /**
-     * Send a message to a channel
-     * @param {string|MessagePayload} message The message to send
-     * @param {string} channelId The ID of the channel to send the message to
-     * @returns {Promise<Message<true>>}
-     */
-    async sendMessage(message: string|MessagePayload|MessageCreateOptions, channelId = process.env.DISCORD_CHANNEL_ID) {
-        if (!channelId) {
-            console.error(`Couldn't send message: No channel ID provided`);
-            return;
-        }
-        const channel = this.client.channels.cache.get(channelId) ?? await this.client.channels.fetch(channelId);
-        if (!channel || !channel.isTextBased()) {
-            console.error(`Couldn't send message: Channel with ID ${channelId} not found`);
-            return;
-        }
-
-        return await channel.send(message);
-    }
-
-    isNightTime() {
-        const now = getNowDate();
-        const hour = now.getHours();
-        return hour >= 3 && hour < 6;
     }
 
 }

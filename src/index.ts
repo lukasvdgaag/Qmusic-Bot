@@ -1,11 +1,14 @@
-import path from "path";
 import {AuthBank} from "./auth/AuthBank";
 import {DiscordBot} from "./DiscordBot";
 import {getNowDate} from "./helpers/TimeHelper";
 
-const envLoc = __dirname.endsWith("src") ? path.resolve(__dirname, "../.env") : path.resolve(__dirname, ".env");
+// const envLoc = __dirname.endsWith("src") ? path.resolve(__dirname, "../.env") : path.resolve(__dirname, ".env");
+//
+// require('dotenv').config({path: envLoc});
+import dotenv from 'dotenv';
 
-require('dotenv').config({path: envLoc});
+dotenv.config();
+
 (async () => {
     console.log("Current time:", getNowDate())
     console.log("Current time millis:", getNowDate().getTime());
