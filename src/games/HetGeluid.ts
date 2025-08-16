@@ -4,18 +4,15 @@ import {getSignUpMomentFromJson, SignUpMoment} from "./objects/SignUpMoment";
 import {HetGeluidAttempt} from "./objects/HetGeluidAttempt";
 import {HetGeluidInformation} from "./objects/HetGeluidInformation";
 import {getNow} from "../helpers/TimeHelper";
+import {AbstractQGame} from "./QGame";
 
-export class HetGeluid {
+export class HetGeluid extends AbstractQGame {
 
-    available: boolean = false;
-    private discordBot: DiscordBot;
     private currentSignupMoment?: SignUpMoment;
     private lastSignUpMomentId?: number;
 
     constructor(discordBot: DiscordBot) {
-        this.discordBot = discordBot;
-
-        this.#init().catch(console.error);
+        super(discordBot);
     }
 
     /**
@@ -143,7 +140,7 @@ export class HetGeluid {
         }
     }
 
-    async #init() {
+    protected async init() {
         const info = await this.fetchSoundInfo();
         this.available = !!info;
 

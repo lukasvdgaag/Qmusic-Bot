@@ -15,13 +15,14 @@ import {
     SlashCommandUserOption
 } from "discord.js";
 import {CommandHandler} from "./CommandHandler";
-import {CatchTheSummerHit} from "./games/CatchTheSummerHit";
 import {SocketListener} from "./SocketListener";
 import {CatchTheArtist} from "./games/CatchTheArtist";
 import {RadioListener} from "./radio/RadioListener";
 import {getNowDate} from "./helpers/TimeHelper";
 import {HetGeluid} from "./games/HetGeluid";
 import {AuthBank} from "./auth/AuthBank";
+import {CatchTheSummerHit} from "./games/catchthesummerhit/CatchTheSummerHit";
+import {CatchTheSummerHitV2} from "./games/catchthesummerhit/CatchTheSummerHitV2";
 
 export class DiscordBot {
 
@@ -88,7 +89,7 @@ export class DiscordBot {
             await this.radioListener.loadStations();
             this.#initCommands();
 
-            this.catchTheSummerHit = new CatchTheSummerHit(this);
+            this.catchTheSummerHit = new CatchTheSummerHitV2(this);
             this.catchTheArtist = new CatchTheArtist(this);
             this.commandHandler = new CommandHandler(this);
             this.hetGeluid = new HetGeluid(this);

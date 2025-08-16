@@ -202,7 +202,7 @@ export class CommandHandler {
 
         const promises = [];
         for (const user of users) {
-            promises.push(this.discordBot.catchTheSummerHit!.getHighscoresForUser(user.username, 0, true));
+            promises.push(this.discordBot.catchTheSummerHit?.getHighscoresForUser(user.username, 0, true));
         }
 
         let rankArray = [];
@@ -292,7 +292,7 @@ export class CommandHandler {
             return;
         }
 
-        await this.discordBot.catchTheSummerHit!.initContestantTracks(username);
+        await this.discordBot.catchTheSummerHit?.initContestantTracks(username);
 
         await this.#sendAccountLinkedMessage(interaction, username, userId);
     }
@@ -301,7 +301,7 @@ export class CommandHandler {
         const user = await this.#getTargetUser(interaction);
         if (!user) return;
 
-        this.discordBot.catchTheSummerHit!.removeUser(user.username);
+        this.discordBot.catchTheSummerHit?.removeUser(user.username);
         await this.discordBot.authBank.removeUser(user.username);
 
         await this.#sendAccountRemovedMessage(interaction, user.username);
@@ -330,7 +330,7 @@ export class CommandHandler {
         if (enable != null || notify != null || catchAtNight != null) {
             await this.discordBot.authBank.saveUsers();
 
-            await this.discordBot.catchTheSummerHit!.initContestantTracks(user.username);
+            await this.discordBot.catchTheSummerHit?.initContestantTracks(user.username);
         }
 
         const embed = new EmbedBuilder()

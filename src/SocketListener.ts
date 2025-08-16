@@ -69,7 +69,7 @@ export class SocketListener {
 
                         if (songInfo.station === 'qmusic_nl') {
                             // Check if the song needs to be caught
-                            this.discordBot.catchTheSummerHit?.checkForCatches(songInfo.title, songInfo.artist).catch(console.log);
+                            this.discordBot.catchTheSummerHit?.checkForCatches(songInfo.title).catch(console.log);
                             this.discordBot.catchTheArtist?.checkForCatch(songInfo).catch(console.log);
                         }
                     } catch (e) {
