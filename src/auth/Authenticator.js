@@ -1,142 +1,78 @@
-const axios = require("axios");
-
-const {HttpCookieAgent, HttpsCookieAgent} = require('http-cookie-agent/http');
-const {CookieJar} = require('tough-cookie');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 
 /**
- * LoginInfo class to log in to the Qmusic API.
- * Mimics the login process of the Qmusic website to obtain a bearer token.
+ * LoginInfo class to log in to the DPG Media API (for Qmusic).
+ * Uses Puppeteer to mimic the login process of the Qmusic website to obtain a JWT token.
  *
  * @class Authenticator
- * @version 1.0.0
+ * @version 3.0.0
  * @since 1.1.0
  */
 class Authenticator {
 
-    #cookieJar;
-    #instance;
-    
-    constructor() {
-        this.#cookieJar = new CookieJar();
-
-        axios.defaults.httpAgent = new HttpCookieAgent({
-            jar: this.#cookieJar,
-            keepAlive: true,
-            rejectUnauthorized: false,
-        });
-        axios.defaults.httpsAgent = new HttpsCookieAgent({
-            jar: this.#cookieJar,
-            keepAlive: true,
-            rejectUnauthorized: false,
-        });
-        this.#instance = axios.create({
-            withCredentials: true,
-            jar: this.#cookieJar,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-                'Accept': '*/*'
-            }
-        });
-
-        this.#instance.interceptors.request.use(async (config) => {
-            config.headers.Cookie = await this.#cookieJar.getCookieString(config.url);
-            return config;
-        });
-    }
-
     /**
-     * Returns the bearer token for the given credentials.
-     * @param username The username of the account.
-     * @param password The password of the account.
+     * Returns the bearer token for the given credentials using a headless browser.
+     * @param {string} username The username of the account.
+     * @param {string} password The password of the account.
      * @returns {Promise<string|null>} Bearer token or null if the credentials are invalid.
      */
     async processLogin(username, password) {
-        await this.#cookieJar.removeAllCookiesSync();
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled'
+            ]
+        });
 
         try {
-            // Request the credentials
-            let response = await this.#instance.get('https://myprivacy.dpgmedia.nl/consent?siteKey=ewjhEFT3YBV10QQd&callbackUrl=https%3a%2f%2fqmusic.nl%2fprivacy%2faccept%3foriginalUrl%3d%252f');
-            await this.#updateCookies(response);
+            // Launch a headless browser instance
+            const page = await browser.newPage();
+            // Step 1: Navigate to the login page to start the authentication flow.
+            await page.goto('https://qmusic.nl/', {waitUntil: 'networkidle2'});
 
-            let cookies = await this.#cookieJar.getCookies('https://myprivacy.dpgmedia.nl/');
-            const authIdCookie = cookies.filter(a => a.key === 'authId')[0].value;
+            // wait for cookie consent popup and accept it
+            await page.$('#pg-host-shadow-root')
+            await page.click('>>> #pg-accept-btn');
+            await page.waitForNavigation();
 
-            // Accept the DPG Media Cookie Policy
-            response = await this.#instance.get(`https://qmusic.nl/privacy/accept?originalUrl=%2F&authId=${authIdCookie}`);
-            await this.#updateCookies(response);
+            await page.goto('https://qmusic.nl/login');
 
-            // Get the CSRF token
-            response = await this.#instance.get('https://qmusic.nl/_csrf/?origin=https%3A%2F%2Fqmusic.nl&domain=.qmusic.nl');
-            await this.#updateCookies(response);
+            // Step 2: On the identify page, enter the email.
+            // The browser will execute the necessary anti-bot scripts in the background.
+            await page.waitForSelector('#username');
+            await page.focus('#username');
+            await page.type('#username', username);
+            await page.click('button[type="submit"]');
 
-            // Retrieve the SSO session ticket
-            response = await this.#instance.get('https://login.dpgmedia.nl/authorize/sso?client_id=qmusicnl-web&redirect_uri=https%3A%2F%2Fqmusic.nl%2Flogin%2Fcallback&response_type=code&scope=profile+email+address+phone+openid&state=https%3A%2F%2Fqmusic.nl%2F', {
-                maxRedirects: 0,
-                validateStatus: (status) => status === 303
+            // Step 3: On the login page, enter the password.
+            await page.waitForSelector('#password');
+            await page.type('#password', password);
+            await page.click('button[type="submit"]');
+
+            // wait for authentication to complete
+            await page.waitForFunction(
+                'window.location.href === "https://qmusic.nl/"',
+                { timeout: 15000 }
+            );
+
+            // Step 4: The final page sets the token. We can now extract it from the page's localStorage.
+            const token = await page.evaluate(() => {
+                // This code runs in the browser's context
+                return localStorage.getItem('radio-auth-token');
             });
-            await this.#updateCookies(response);
 
-            response = await this.#instance.get(`https://login.dpgmedia.nl/identify?client_id=qmusicnl-web`);
-            await this.#updateCookies(response);
-
-            // Login to the DPG Media account
-            const loginPayload = new FormData();
-            loginPayload.append('username', username);
-            loginPayload.append('password', password);
-            const encodedEmail = this.#encodeEmail(username);
-            const loginUrl = `https://login.dpgmedia.nl/login?client_id=qmusicnl-web&email=${encodedEmail}`;
-            response = await this.#instance.post(loginUrl, loginPayload, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Referer': loginUrl,
-                },
-            });
-            await this.#updateCookies(response);
-
-            // Continue the login process
-            response = await this.#instance.get('https://login.dpgmedia.nl/authorize/continue/sso?client_id=qmusicnl-web', {
-                maxRedirects: 0,
-                validateStatus: (status) => status === 303
-            });
-            await this.#updateCookies(response);
-
-            // request the redirect url of the previous response
-            response = await this.#instance.get(response.headers.location, {
-                maxRedirects: 0,
-                validateStatus: (status) => status === 303
-            });
-            await this.#updateCookies(response);
-
-            // request the redirect url of the previous response
-            response = await this.#instance.get(response.headers.location, {
-                maxRedirects: 0
-            });
-            await this.#updateCookies(response);
-
-            return this.#extractBearerTokenFromHtml(response.data);
+            await browser.close();
+            return token;
         } catch (e) {
-            console.error(e);
+            console.error("An error occurred during the login process:", e.message);
+            await browser?.close();
             return null;
         }
     }
-
-    #encodeEmail(email) {
-        return Buffer.from(email).toString('base64');
-    }
-
-    #extractBearerTokenFromHtml(html) {
-        const match = html.match(/localStorage\.setItem\('radio-auth-token', "(.*?)"\)/);
-        return match ? match[1] : null;
-    }
-
-    async #updateCookies(response) {
-        if (response.headers['set-cookie']) {
-            for (const cookieStr of response.headers['set-cookie']) {
-                await this.#cookieJar.setCookieSync(cookieStr, response.config.url, {ignoreError: true});
-            }
-        }
-    }
-
 }
 
 module.exports = Authenticator;

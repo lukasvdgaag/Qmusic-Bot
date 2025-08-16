@@ -13,6 +13,7 @@ class SocketListener {
      * @type {Map<string, SongInfo>}
      */
     playingNow;
+    debugMode = true;
 
     constructor(discordBot) {
         this.#discordBot = discordBot;
@@ -43,9 +44,11 @@ class SocketListener {
             const embed = new EmbedBuilder()
                 .setTitle('Connected to websocket')
                 .setColor("#7ed90e")
-                .setDescription(`The connection to the Qmusic websocket has been established. Monitoring the Catch The Summer Hit game for ${this.#discordBot.authBank.users.size} users.`);
+                .setDescription(`The connection to the Qmusic websocket has been established. Monitoring QMusic events for ${this.#discordBot.authBank.users.size} users.`);
 
-            this.#discordBot.sendMessage({embeds: [embed]}).catch(console.log);
+            if (!this.debugMode) {
+                this.#discordBot.sendMessage({embeds: [embed]}).catch(console.log);
+            }
 
             for (const message of this.messages) {
                 connection.sendUTF(message);
