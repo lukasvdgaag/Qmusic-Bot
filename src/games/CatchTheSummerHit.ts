@@ -37,7 +37,7 @@ export class CatchTheSummerHit {
 
     async #isGameAvailable() {
         try {
-            const response = await axios.get('https://api.qmusic.nl/2.4/cth/games/17');
+            const response = await axios.get(BASE_URL);
 
             if (response.status !== 200) return false;
 
@@ -81,7 +81,7 @@ export class CatchTheSummerHit {
         if (!this.available) return;
 
         try {
-            const response = await axios.get('https://api.qmusic.nl/2.4/cth/games/17/track_of_the_day');
+            const response = await axios.get(`${BASE_URL}/track_of_the_day`);
 
             if (response.status !== 200) {
                 this.trackOfTheDay = undefined;
@@ -155,7 +155,7 @@ export class CatchTheSummerHit {
         if (!user) return undefined;
 
         try {
-            const {data} = await axios.get('https://api.qmusic.nl/2.4/cth/games/17/contestant', {
+            const {data} = await axios.get(`${BASE_URL}/contestant`, {
                 headers: {
                     'Authorization': `Bearer ${user.token}`
                 }
@@ -174,7 +174,7 @@ export class CatchTheSummerHit {
         if (!user) return;
 
         try {
-            return axios.post('https://api.qmusic.nl/2.4/cth/games/17/catches', {track_id: trackId}, {
+            return axios.post(`${BASE_URL}/catches`, {track_id: trackId}, {
                 headers: {
                     'Authorization': `Bearer ${user.token}`
                 }
@@ -193,7 +193,7 @@ export class CatchTheSummerHit {
         if (!user) return undefined;
 
         try {
-            const response = await axios.get(`https://api.qmusic.nl/2.4/cth/games/17/highscores`, {
+            const response = await axios.get(`${BASE_URL}/highscores`, {
                 params: {
                     limit
                 },
@@ -314,3 +314,9 @@ export class CatchTheSummerHit {
     }
 
 }
+
+// game in 2023
+// const BASE_URL = 'https://api.qmusic.nl/2.4/cth/games/17';
+
+// game in 2025
+const BASE_URL = 'https://api.qmusic.nl/2.4/cth/games/38';
